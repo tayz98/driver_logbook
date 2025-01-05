@@ -1,7 +1,8 @@
+import 'dart:async';
+
+import 'package:elogbook/services/custom_bluetooth_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import "../services/custom_bluetooth_service.dart";
-import '../services/elm327_services.dart';
+import 'package:elogbook/notification_configuration.dart'; // Import the notification service
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -11,24 +12,34 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  late CustomBluetoothService customBluetoothService;
-  Elm327Service? elm327Service;
-  final List<String> log = [];
-
+  final CustomBluetoothService _bluetoothService = CustomBluetoothService();
+  final List<String> _logs = [];
+  late StreamSubscription<List<String>> _logSubscription;
   @override
   void initState() {
     super.initState();
-    customBluetoothService = CustomBluetoothService();
-    customBluetoothService.logStream.stream.listen((newLog) {
+    showBasicNotification(
+        title: "TestNotification", body: "This is a test notification");
+    // Listen to the logStream and update the UI accordingly
+    _bluetoothService.logStream.listen((logList) {
       setState(() {
-        log.addAll(newLog);
+        _logs.addAll(logList);
+      });
+    });
+    _logSubscription = _bluetoothService.logStream.listen((logList) {
+      setState(() {
+        _logs.addAll(logList);
+
+        if (_logs.length > 100) {
+          _logs.removeRange(0, _logs.length - 10);
+        }
       });
     });
   }
 
   @override
   void dispose() {
-    customBluetoothService.dispose();
+    _logSubscription.cancel();
     super.dispose();
   }
 
@@ -38,11 +49,26 @@ class _HomeState extends State<Home> {
       appBar: AppBar(
         title: const Text("OBD-II Flutter App"),
       ),
-      body: ListView.builder(itemBuilder: (context, index) {
-        return ListTile(
-          title: Text(log[index]),
-        );
-      }),
+      body: _logs.isEmpty
+          ? const Center(child: Text("No logs available"))
+          : ListView.builder(
+              itemCount: _logs.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  dense: true, // Makes the ListTile denser
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 4.0, // Reduced vertical padding
+                  ),
+                  title: Text(
+                    _logs[index],
+                    style: const TextStyle(
+                      fontSize: 14.0, // Smaller font size
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
