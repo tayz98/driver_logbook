@@ -1,4 +1,8 @@
 class CarUtils {
+  static String cleanResponse(String response) {
+    return response.trim().replaceAll("7E8|\\s|>|0D|:", "");
+  }
+
   /// Converts a hex string (e.g., "544D42") to its ASCII representation ("TMB").
   static String hexToAscii(String hexString) {
     final buffer = StringBuffer();
@@ -13,33 +17,33 @@ class CarUtils {
 
   /// Parses the last 4 hex characters of [response] into an integer.
   /// Returns 0 if parsing fails or if the response is too short.
-  static int getCarKm(String response) {
+  static double getCarKm(String response) {
     print("Entered getCarKm with response: $response");
     try {
       if (response.isEmpty) {
         print("Empty response.");
-        return 0;
+        return 0.0; // Return double 0.0
       }
       if (response.length >= 4) {
         print("Response length is sufficient.");
-        final cleanedResponse = response
-            .trim()
-            .replaceAll(" ", "")
-            .replaceAll(">", "")
-            .replaceAll("0D", "");
+        final cleanedResponse = cleanResponse(response);
         print("Cleaned response: $cleanedResponse");
         final kmInHex = cleanedResponse.substring(cleanedResponse.length - 8);
         print("KM in Hex: $kmInHex");
-        final carKm = int.parse(kmInHex, radix: 16);
+
+        // Parse hex to integer, then convert to double
+        final int kmAsInt = int.parse(kmInHex, radix: 16);
+        final double carKm = kmAsInt.toDouble(); // Convert to double
         print("Car KM: $carKm");
+
         return carKm;
       } else {
         print("Response too short for KM extraction.");
-        return 0;
+        return 0.0; // Return double 0.0
       }
     } catch (e) {
       print("Error parsing KM: $e");
-      return 0;
+      return 0.0; // Return double 0.0
     }
   }
 
@@ -48,12 +52,7 @@ class CarUtils {
   /// and finally converts the last 17 bytes (34 hex chars) to ASCII.
   static String getCarVin(String response) {
     // Step 1: Remove "7E8", spaces, literal dots (if any).
-    String cleaned = response
-        .trim()
-        .replaceAll("7E8", "")
-        .replaceAll(" ", "")
-        .replaceAll(".", "")
-        .replaceAll(":", "");
+    String cleaned = cleanResponse(response);
 
     // Step 2: Remove "21" at index 16
     if (cleaned.length >= 18 && cleaned.substring(16, 18) == "21") {
