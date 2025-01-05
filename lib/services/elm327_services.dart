@@ -95,6 +95,10 @@ class Elm327Service {
   }
 
   Future<bool> _checkData() async {
+    await _sendCommand("0902");
+    Future.delayed(const Duration(milliseconds: 500));
+    await _sendCommand("2210E01");
+    Future.delayed(const Duration(milliseconds: 500));
     return dataIsValid = await _checkVin() && await _checkMileage();
   }
 

@@ -78,15 +78,17 @@ class CustomBluetoothService {
           logStream.add(["Connected to ${device.advName}"]);
         }
         if (_connectionState == BluetoothConnectionState.disconnected) {
-          _connectedDevice = null;
+          _disconnectDevice();
           logStream.add(["Disconnected from ${device.remoteId}"]);
         }
+        _isConnecting = false;
       });
       _mtuSubscription = _connectedDevice?.mtu.listen((mtu) {
         mtuSize = mtu;
         logStream.add(["MTU Size: $mtu"]);
       });
     } catch (e) {
+      _isConnecting = false;
       logStream.add(["Connection error: $e"]);
     }
   }
@@ -133,19 +135,18 @@ class CustomBluetoothService {
   }
 
   Future<void> _disconnectDevice() async {
-    if (_connectedDevice != null) {
-      try {
-        logStream.add(["Disconnecting from ${_connectedDevice!.remoteId}..."]);
+    try {
+      logStream.add(["Disconnecting from ${_connectedDevice!.remoteId}..."]);
+      if (_connectedDevice != null) {
         await _connectedDevice!.disconnectAndUpdateStream(queue: true);
-        stopRssiMonitoring();
-        _writeCharacteristic = null;
-        _notifyCharacteristic = null;
-        _connectedDevice = null;
-        _connectionState = BluetoothConnectionState.disconnected;
-        logStream.add(["Disconnected successfully."]);
-      } catch (e) {
-        logStream.add(["Error disconnecting: $e"]);
       }
+      stopRssiMonitoring();
+      _writeCharacteristic = null;
+      _notifyCharacteristic = null;
+      _connectedDevice = null;
+      logStream.add(["Disconnected successfully."]);
+    } catch (e) {
+      logStream.add(["Error disconnecting: $e"]);
     }
   }
 
