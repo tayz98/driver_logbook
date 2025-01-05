@@ -97,7 +97,6 @@ class CustomBluetoothService {
     List<BluetoothService> services =
         await _connectedDevice!.discoverServices();
     for (BluetoothService service in services) {
-      // Common ELM327 BLE Service UUID
       print(service.uuid.toString());
       if (service.uuid == _targetService) {
         for (BluetoothCharacteristic c in service.characteristics) {
@@ -109,7 +108,6 @@ class CustomBluetoothService {
             _notifyCharacteristic = c;
             logStream.add(["Notify Characteristic found: ${c.uuid}"]);
             await c.setNotifyValue(true);
-            //c.lastValueStream.listen(_handleReceivedData);
           }
         }
       }
@@ -117,7 +115,8 @@ class CustomBluetoothService {
     if (_writeCharacteristic != null && _notifyCharacteristic != null) {
       logStream.add(["Characteristics ready. Initializing Dongle..."]);
       elm327Service = Elm327Service(_connectedDevice!);
-      await elm327Service!.initialize();
+      _notifyCharacteristic!.lastValueStream
+          .listen(elm327Service!.handleReceivedData);
     } else {
       logStream.add(["Required characteristics not found."]);
     }
