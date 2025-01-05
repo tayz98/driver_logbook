@@ -18,9 +18,7 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    customBluetoothService = CustomBluetoothService(
-        targetService: Guid("0000fff0-0000-1000-8000-00805f9b34fb"),
-        targetMac: "8C:DE:52:DE:CB:DC");
+    customBluetoothService = CustomBluetoothService();
     customBluetoothService.logStream.stream.listen((newLog) {
       setState(() {
         log.addAll(newLog);

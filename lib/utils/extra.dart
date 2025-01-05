@@ -33,7 +33,7 @@ extension Extra on BluetoothDevice {
   Future<void> connectAndUpdateStream() async {
     _cstream.add(true);
     try {
-      await connect(autoConnect: true, mtu: null);
+      await connect(mtu: null);
     } finally {
       _cstream.add(false);
     }

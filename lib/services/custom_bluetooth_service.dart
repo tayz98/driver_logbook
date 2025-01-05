@@ -16,24 +16,22 @@ class CustomBluetoothService {
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
   late StreamSubscription<List<ScanResult>> _scanSubscription;
   late StreamSubscription<bool> _isScanningSubscription;
+  final Guid _targetService = Guid("0000fff0-0000-1000-8000-00805f9b34fb");
   Timer? _disconnectTimer;
   final int _disconnectRssiThreshold = -90;
   final int _connectRssiTreshold = -80;
-  final Guid _targetService;
-  final String _targetMac;
   bool _isConnecting = false;
   bool _isScanning = false;
   int? rssi;
   int? mtuSize;
   Elm327Service? elm327Service;
+  final List<String> knownRemoteIds = ["8C:DE:52:DE:CB:DC"];
 
-  CustomBluetoothService(
-      {required Guid targetService, required String targetMac})
-      : _targetService = targetService,
-        _targetMac = targetMac {
+  CustomBluetoothService() {
+    FlutterBluePlus.setOptions(restoreState: true);
     _scanSubscription = FlutterBluePlus.onScanResults.listen((results) {
       for (ScanResult r in results) {
-        if (r.device.remoteId.toString().toUpperCase() == _targetMac) {
+        if (knownRemoteIds.contains(r.device.remoteId.str)) {
           if (r.rssi > _connectRssiTreshold &&
               _isConnecting == false &&
               _connectedDevice == null) {
@@ -50,7 +48,7 @@ class CustomBluetoothService {
       _isScanning = state;
       if (_isScanning == false && _connectedDevice == null) {
         FlutterBluePlus.startScan(
-            timeout: const Duration(seconds: 5), continuousUpdates: true);
+            timeout: const Duration(seconds: 10), continuousUpdates: true);
       }
       logStream.add(["Scanning: $state"]);
     });
@@ -141,6 +139,8 @@ class CustomBluetoothService {
         await _connectedDevice!.disconnectAndUpdateStream(queue: true);
       }
       stopRssiMonitoring();
+      _connectedDevice!.cancelWhenDisconnected(_connectionStateSubscription!,
+          delayed: true, next: true);
       _writeCharacteristic = null;
       _notifyCharacteristic = null;
       _connectedDevice = null;
