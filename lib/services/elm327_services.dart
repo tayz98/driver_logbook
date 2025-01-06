@@ -1,15 +1,17 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:elogbook/notification_configuration.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../utils/car_utils.dart';
 
 // TODO: use provider, bloc or riverpod for state managing the vehicle data
 class Elm327Service {
   final BluetoothDevice device;
-  BluetoothCharacteristic? writeCharacteristic;
-  BluetoothCharacteristic? notifyCharacteristic;
-  final StreamController<List<String>> logStream =
-      StreamController<List<String>>.broadcast();
+  BluetoothCharacteristic writeCharacteristic;
+  BluetoothCharacteristic notifyCharacteristic;
+  final StreamController<String> _logStreamController =
+      StreamController<String>.broadcast();
+  Stream<String> get logStream => _logStreamController.stream;
   final StreamController<bool> ignitionStreamController =
       StreamController<bool>.broadcast();
   bool ignitionIsTurnedOn = false;
@@ -17,9 +19,11 @@ class Elm327Service {
   String? carVin;
   double? carMileage;
   Timer? ignitionOffTimer;
+  Timer? checkIgnitionTimer;
   late Future<bool> _dataCheckFuture;
 
-  Elm327Service(this.device) {
+  Elm327Service(
+      this.device, this.writeCharacteristic, this.notifyCharacteristic) {
     _initialize();
   }
 
@@ -38,29 +42,26 @@ class Elm327Service {
       await _sendCommand(cmd);
       await Future.delayed(const Duration(milliseconds: 500));
     }
-    logStream.add(["ELM327 Initialized"]);
+    _logStreamController.add("ELM327 Initialized");
     _dataCheckFuture = _checkData();
-    // repeat ignition status check every 2 seconds
-    Timer.periodic(const Duration(seconds: 2), (timer) async {
+    // repeat ignition status check every 4 seconds
+    checkIgnitionTimer =
+        Timer.periodic(const Duration(seconds: 4), (timer) async {
       await _sendCommand("AT IGN");
     });
     _startIgnitionStreamSubscription();
   }
 
   Future<void> _sendCommand(String command) async {
-    if (writeCharacteristic == null) {
-      logStream.add(["Write Characteristic is null"]);
-      return;
-    }
     String fullCommand = "$command\r";
     List<int> bytes = utf8.encode(fullCommand);
     try {
-      await writeCharacteristic!.write(bytes, withoutResponse: true);
-      logStream.add(["Sent: $command"]);
+      await writeCharacteristic.write(bytes, withoutResponse: true);
+      _logStreamController.add("Sent: $command");
     } catch (e) {
-      logStream.add(["Error sending command '$command': $e"]);
+      _logStreamController.add("Error sending command '$command': $e");
       if (command == "ATZ") {
-        logStream.add(["Failed to reset ELM327. Disconnecting."]);
+        _logStreamController.add("Failed to reset ELM327. Disconnecting.");
         //device.disconnect();
         // or other logic here for critical commands
       } else {
@@ -71,14 +72,16 @@ class Elm327Service {
 
   void handleReceivedData(List<int> data) {
     String response = utf8.decode(data).trim().replaceAll(" ", "");
-    logStream.add(["Received: $response"]);
+    _logStreamController.add("Received: $response");
 
     bool previousState = ignitionIsTurnedOn;
 
     if (response.contains("ON")) {
-      ignitionIsTurnedOn = true;
+      ignitionStreamController.add(true);
+      _logStreamController.add("Ignition turned ON");
     } else if (response.contains("OFF")) {
       ignitionIsTurnedOn = false;
+      _logStreamController.add("Ignition turned OFF");
     }
 
     if (ignitionIsTurnedOn != previousState) {
@@ -87,18 +90,20 @@ class Elm327Service {
 
     if (response.startsWith("0902")) {
       carVin = CarUtils.getCarVin(response);
+      _logStreamController.add("VIN: $carVin");
     }
 
     if (response.contains("10E1")) {
       carMileage = CarUtils.getCarKm(response);
+      _logStreamController.add("Mileage: $carMileage");
     }
   }
 
   Future<bool> _checkData() async {
     await _sendCommand("0902");
-    Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 500));
     await _sendCommand("2210E01");
-    Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 500));
     return dataIsValid = await _checkVin() && await _checkMileage();
   }
 
@@ -131,25 +136,29 @@ class Elm327Service {
   void _startIgnitionStreamSubscription() {
     ignitionStreamController.stream.listen((isIgnitionOn) async {
       if (isIgnitionOn == true) {
-        logStream.add(["Ignition turned ON"]);
+        _logStreamController.add("Ignition turned ON");
         // Cancel any pending OFF timer
         ignitionOffTimer?.cancel();
         // Validate data and start trip monitoring
         bool dataIsValid = await _dataCheckFuture;
         if (dataIsValid) {
-          logStream.add(["Data is valid. Starting trip monitoring."]);
+          _logStreamController.add("Data is valid. Starting trip monitoring.");
           _startTelemetryCollection();
         } else {
-          logStream.add(["Data is invalid. Ending trip monitoring."]);
+          showBasicNotification(
+              title: "Data is invalid", body: "Ending trip monitoring");
+          checkIgnitionTimer?.cancel();
+          _logStreamController.add("Data is invalid. Ending trip monitoring.");
           // TODO: Notify user of invalid data, he can turn the ignition off and on again
+          showBasicNotification(title: "Trip Ending", body: "Data incorrect");
           // handle invalid data (e.g. retry)
         }
       } else {
-        logStream.add(["Ignition turned OFF"]);
+        _logStreamController.add("Ignition turned OFF");
         // Set a timer to delay trip monitoring termination
         ignitionOffTimer = Timer(const Duration(seconds: 10), () {
-          logStream.add(
-              ["Ignition OFF confirmed after delay. Ending trip monitoring."]);
+          _logStreamController.add(
+              "Ignition OFF confirmed after delay. Ending trip monitoring.");
           _endTelemetryCollection();
         });
       }
@@ -157,25 +166,30 @@ class Elm327Service {
   }
 
   void _startTelemetryCollection() async {
-    logStream.add(["Telemetry collection started"]);
+    showBasicNotification(
+        title: "Telemetry", body: "Telemetry collection is running");
+    _logStreamController.add("Telemetry collection started");
     await _sendCommand("2210E01"); // mileage
-    logStream
-        .add(["Telemetry data collected: VIN: $carVin, Mileage: $carMileage"]);
+    _logStreamController
+        .add("Telemetry data collected: VIN: $carVin, Mileage: $carMileage");
   }
 
   void _endTelemetryCollection() {
-    logStream.add(["Trip monitoring ended. Saving trip data."]);
+    showBasicNotification(
+        title: "Telemetry", body: "Telemetry collection ended");
+    _logStreamController.add("Trip monitoring ended. Saving trip data.");
     _saveTripData();
   }
 
   void _saveTripData() {
-    logStream
-        .add(["Saving trip data:", "VIN: $carVin", "Mileage: $carMileage"]);
+    _logStreamController
+        .add("Saving trip data: VIN: $carVin Mileage: $carMileage");
   }
 
   void dispose() {
-    logStream.close();
+    _logStreamController.close();
     ignitionStreamController.close();
     ignitionOffTimer?.cancel();
+    checkIgnitionTimer?.cancel();
   }
 }

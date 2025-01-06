@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import "../services/custom_bluetooth_service.dart";
+//import 'package:path/path.dart';
+//import 'package:sqflite/sqflite.dart';
 
 final StreamController<NotificationResponse> selectNotificationStream =
     StreamController<NotificationResponse>.broadcast();
@@ -23,7 +24,6 @@ Future<void> main() async {
   requestNotificationPermission();
 
   FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
-  CustomBluetoothService customBluetoothService = CustomBluetoothService();
   runApp(const MyApp());
 }
 
