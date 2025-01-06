@@ -1,0 +1,225 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:8291371537758625746",
+      "lastPropertyId": "3:7058414077217498616",
+      "name": "Driver",
+      "properties": [
+        {
+          "id": "1:2285555592967583279",
+          "name": "id",
+          "type": 6,
+          "flags": 129
+        },
+        {
+          "id": "2:247790464164907438",
+          "name": "isAuthorized",
+          "type": 1
+        },
+        {
+          "id": "3:7058414077217498616",
+          "name": "privateTrips",
+          "type": 1
+        }
+      ],
+      "relations": [
+        {
+          "id": "1:8053518692451467066",
+          "name": "trips",
+          "targetId": "5:7576480547456164306"
+        }
+      ]
+    },
+    {
+      "id": "2:5901901481565787140",
+      "lastPropertyId": "1:6433781710868316699",
+      "name": "Gps",
+      "properties": [
+        {
+          "id": "1:6433781710868316699",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "3:1008795260177827012",
+      "lastPropertyId": "4:3696501081838497006",
+      "name": "Location",
+      "properties": [
+        {
+          "id": "1:6313985022766044163",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:1239293121620796112",
+          "name": "street",
+          "type": 9
+        },
+        {
+          "id": "3:8868612911150543510",
+          "name": "city",
+          "type": 9
+        },
+        {
+          "id": "4:3696501081838497006",
+          "name": "postalCode",
+          "type": 9
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "4:4623885551922969092",
+      "lastPropertyId": "3:4008279420136613746",
+      "name": "Telemetry",
+      "properties": [
+        {
+          "id": "1:2421463508963451349",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7515293752943471500",
+          "name": "gpsId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "1:5812603054223812936",
+          "relationTarget": "Gps"
+        },
+        {
+          "id": "3:4008279420136613746",
+          "name": "vehicleDiagnosticsId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "2:7291338709312035993",
+          "relationTarget": "Vehiclediagnostics"
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "5:7576480547456164306",
+      "lastPropertyId": "9:50545977446855383",
+      "name": "Trip",
+      "properties": [
+        {
+          "id": "1:7225924636543553046",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:8711551546510538148",
+          "name": "tripInformationId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "3:2381262226011791789",
+          "relationTarget": "TripInformation"
+        },
+        {
+          "id": "3:4138140637291787770",
+          "name": "startLocationId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "4:4690736537365864121",
+          "relationTarget": "Location"
+        },
+        {
+          "id": "4:2491982752079094549",
+          "name": "endLocationId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "5:8860028433054077956",
+          "relationTarget": "Location"
+        },
+        {
+          "id": "5:6219580597257460309",
+          "name": "startMileage",
+          "type": 8
+        },
+        {
+          "id": "6:6013629179958562458",
+          "name": "endMileage",
+          "type": 8
+        },
+        {
+          "id": "7:8920345630354971422",
+          "name": "telemetryId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "6:2758830007158379056",
+          "relationTarget": "Telemetry"
+        },
+        {
+          "id": "8:350530437595885314",
+          "name": "tripCategory",
+          "type": 9
+        },
+        {
+          "id": "9:50545977446855383",
+          "name": "tripStatus",
+          "type": 9
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "6:1249598320733653736",
+      "lastPropertyId": "1:7004838042793205157",
+      "name": "TripInformation",
+      "properties": [
+        {
+          "id": "1:7004838042793205157",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "7:8410898522382471687",
+      "lastPropertyId": "3:6580901697177358760",
+      "name": "Vehiclediagnostics",
+      "properties": [
+        {
+          "id": "1:5745589683350580440",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:2190900124390503031",
+          "name": "vin",
+          "type": 9
+        },
+        {
+          "id": "3:6580901697177358760",
+          "name": "currentMileage",
+          "type": 8
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "7:8410898522382471687",
+  "lastIndexId": "6:2758830007158379056",
+  "lastRelationId": "1:8053518692451467066",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}

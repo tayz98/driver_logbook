@@ -1,61 +1,37 @@
+import 'package:objectbox/objectbox.dart';
+
 import './location.dart';
 import './trip_information.dart';
 import './trip_status.dart';
 import './trip_category.dart';
 import './telemetry.dart';
-import "package:flutter_riverpod/flutter_riverpod.dart";
 
+@Entity()
 class Trip {
-  final int id;
-  final int driverId;
-  TripInformation tripInformation = TripInformation();
-  Location startLocation;
-  Location? endLocation;
+  @Id()
+  int id = 0;
+
+  final tripInformation = ToOne<TripInformation>();
+  final startLocation = ToOne<Location>();
+  final endLocation = ToOne<Location?>();
+
   double startMileage;
   double? endMileage;
-  TripCategory tripCategory;
-  TripStatus tripStatus = TripStatus.inProgress;
-  Telemetry? telemetry;
+  String tripCategory;
+  String tripStatus;
+  final telemetry = ToOne<Telemetry>();
 
   Trip({
-    required this.driverId,
-    required this.startLocation,
-    this.endLocation,
+    required ToOne<Location> startLocation,
+    required ToOne<Telemetry> telemetry,
     required this.tripStatus,
     required this.startMileage,
-    this.endMileage,
     required this.tripCategory,
-  }) : id = DateTime.now().millisecondsSinceEpoch;
-}
+  });
 
-class TripNotifier extends StateNotifier<Trip?> {
-  TripNotifier(super.state);
+  TripCategory get tripCategoryEnum =>
+      TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
 
-  void startTrip(Trip trip) {
-    state = Trip(
-        driverId: trip.driverId,
-        startLocation: trip.startLocation,
-        startMileage: trip.startMileage,
-        tripCategory: trip.tripCategory,
-        tripStatus: TripStatus.inProgress);
-  }
-
-  void endTrip() {
-    if (state != null) {
-      state!.tripStatus = TripStatus.finished;
-      state!.endMileage = state!.startMileage;
-      state!.endLocation = state!.startLocation;
-    }
-  }
-
-  void cancelTrip() {
-    if (state != null) {
-      state!.tripStatus = TripStatus.cancelled;
-      // TODO: think about it
-    }
-  }
-
-  void updateTrip(Trip trip) {
-    state = trip;
-  }
+  TripStatus get tripStatusEnum =>
+      TripStatus.values.firstWhere((e) => e.toString() == tripStatus);
 }

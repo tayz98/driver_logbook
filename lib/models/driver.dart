@@ -1,40 +1,14 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'trip.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:objectbox/objectbox.dart';
 
+@Entity()
 class Driver {
-  final int selfAssignedId;
+  @Id(assignable: true)
+  int id = 0;
   bool isAuthorized = false;
   bool privateTrips = false;
-  Trip? currentTrip;
+  final trips = ToMany<Trip>();
 
-  Driver({
-    required this.selfAssignedId,
-  });
+  Driver();
 }
-
-class DriverNotifier extends StateNotifier<Driver?> {
-  DriverNotifier(super.state);
-
-  void logIn(String id) {
-    state = Driver(selfAssignedId: int.parse(id));
-  }
-
-  void logOut() {
-    state = null;
-  }
-
-  void setDriver(Driver driver) {
-    state = driver;
-  }
-
-  void setCurrentTrip(Trip trip) {
-    if (state != null) {
-      state!.currentTrip = trip;
-    }
-  }
-}
-
-final driverProvider = StateNotifierProvider<DriverNotifier, Driver?>((ref) {
-  return DriverNotifier(null);
-});

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:elogbook/notification_configuration.dart';
+
 import 'package:elogbook/views/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-//import 'package:path/path.dart';
-//import 'package:sqflite/sqflite.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final StreamController<NotificationResponse> selectNotificationStream =
     StreamController<NotificationResponse>.broadcast();
@@ -24,7 +24,7 @@ Future<void> main() async {
   requestNotificationPermission();
 
   FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

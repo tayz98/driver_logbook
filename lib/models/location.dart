@@ -1,4 +1,9 @@
+import 'package:objectbox/objectbox.dart';
+
+@Entity()
 class Location {
+  @Id()
+  int id = 0;
   final String street;
   final String city;
   final String postalCode;

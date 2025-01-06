@@ -1,25 +1,30 @@
 name: elogbook
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
-  sdk: '>=3.3.4 <4.0.0'
+  sdk: ">=3.3.4 <4.0.0"
 
 dependencies:
+  build_runner: ^2.4.14
   flutter:
     sdk: flutter
   flutter_blue_plus: ^1.34.5
   flutter_local_notifications: ^18.0.1
   flutter_riverpod: ^2.6.1
+  objectbox: ^4.0.3
+  objectbox_generator: ^4.0.3
   path: ^1.9.0
   permission_handler: ^11.3.1
+  riverpod: ^2.6.1
   sqflite: ^2.4.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  json_serializable: ^6.1.5
 
 flutter:
   uses-material-design: true
