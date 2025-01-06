@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:elogbook/notification_configuration.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../utils/car_utils.dart';
+import '../models/vehicle_diagnostics.dart';
 
 // TODO: use provider, bloc or riverpod for state managing the vehicle data
 class Elm327Service {
@@ -12,6 +13,10 @@ class Elm327Service {
   final StreamController<String> _logStreamController =
       StreamController<String>.broadcast();
   Stream<String> get logStream => _logStreamController.stream;
+  final StreamController<Vehiclediagnostics> tripDataStreamController =
+      StreamController<Vehiclediagnostics>.broadcast();
+  Stream<Vehiclediagnostics> get tripDataStream =>
+      tripDataStreamController.stream;
   final StreamController<bool> ignitionStreamController =
       StreamController<bool>.broadcast();
   bool ignitionIsTurnedOn = false;
@@ -104,10 +109,10 @@ class Elm327Service {
     await Future.delayed(const Duration(milliseconds: 500));
     await _sendCommand("2210E01");
     await Future.delayed(const Duration(milliseconds: 500));
-    return dataIsValid = await _checkVin() && await _checkMileage();
+    return dataIsValid = _checkVin() && _checkMileage();
   }
 
-  Future<bool> _checkVin() async {
+  bool _checkVin() {
     // Ensure carVin is not null
     if (carVin != null) {
       // Check length
@@ -115,22 +120,22 @@ class Elm327Service {
         // Regex to validate VIN format (excludes I, O, Q)
         final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
         if (vinRegex.hasMatch(carVin!)) {
-          return Future.value(true);
+          return true;
         }
       }
     }
-    return Future.value(false);
+    return false;
   }
 
-  Future<bool> _checkMileage() async {
+  bool _checkMileage() {
     // Ensure mileage is not null
     if (carMileage != null) {
       // Check if mileage is within a realistic range
       if (carMileage! >= 0 && carMileage! <= 2000000) {
-        return Future.value(true); // Valid mileage
+        return true;
       }
     }
-    return Future.value(false); // Invalid mileage
+    return false; // Invalid mileage
   }
 
   void _startIgnitionStreamSubscription() {
@@ -172,6 +177,10 @@ class Elm327Service {
     await _sendCommand("2210E01"); // mileage
     _logStreamController
         .add("Telemetry data collected: VIN: $carVin, Mileage: $carMileage");
+    tripDataStreamController.add(Vehiclediagnostics(
+        vin: carVin!,
+        lastMileageUpdate: DateTime.now(),
+        currentMileage: carMileage!));
   }
 
   void _endTelemetryCollection() {

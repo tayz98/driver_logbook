@@ -1,9 +1,6 @@
 class TripInformation {
-  String title;
-  String description;
+  final String _title = "Trip Service";
+  String _description = "";
 
-  TripInformation({
-    required this.title,
-    required this.description,
-  });
+  TripInformation();
 }

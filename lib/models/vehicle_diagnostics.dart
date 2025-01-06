@@ -1,7 +1,10 @@
 class Vehiclediagnostics {
   final String vin;
   double currentMileage;
+  DateTime? lastMileageUpdate;
 
-  Vehiclediagnostics.Vehicleiagnostics(
-      {required this.vin, required this.currentMileage});
+  Vehiclediagnostics(
+      {required this.vin,
+      required this.currentMileage,
+      this.lastMileageUpdate});
 }
