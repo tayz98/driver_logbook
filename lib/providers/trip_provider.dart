@@ -87,6 +87,7 @@ class TripNotifier extends StateNotifier<Trip?> {
   }
 
   void _startTelemetryStartedListening() {
+    // TODO: fix
     _telemetryStartedSubscription =
         _elm327Service!.telemetryStartedStream.listen((_) {
       _startListening();

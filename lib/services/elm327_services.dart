@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:elogbook/notification_configuration.dart';
+import 'package:elogbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../utils/car_utils.dart';
 import '../models/vehicle_diagnostics.dart';
 
 class Elm327Service {
@@ -30,11 +30,15 @@ class Elm327Service {
 
   bool isIgnitionTurnedOn = false;
   bool dataIsValid = false;
+  bool isTelemetryRunning = false;
   String? carVin;
   double? carMileage;
   Timer? ignitionOffTimer;
   Timer? checkIgnitionTimer;
   Timer? telemetryTimer;
+  String? _currentCommand;
+  bool _isCommandInProgress = false;
+
   final BluetoothDevice device;
   BluetoothCharacteristic writeCharacteristic;
   BluetoothCharacteristic notifyCharacteristic;
@@ -51,102 +55,114 @@ class Elm327Service {
       "ATE0", // Echo Off
       "ATL0", // Linefeeds Off
       "ATS0", // Spaces Off
-      "ATH0", // Headers Off
+      "ATH0", // Headers off, so only the payload is returned
       "ATSP0", // Set Protocol to Automatic
       "ATSH 7E0", // Set Header to 7E0
     ];
     await Future.delayed(const Duration(seconds: 1));
     for (String cmd in initCommands) {
       await _sendCommand(cmd);
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 1500));
     }
-    _logStreamController.add("ELM327 Initialized");
-    // repeat ignition status check every 4 seconds
     checkIgnitionTimer =
-        Timer.periodic(const Duration(seconds: 4), (timer) async {
-      await _sendCommand("AT IGN");
+        Timer.periodic(const Duration(seconds: 3), (timer) async {
+      await _sendCommand("2210E01"); // malfunction indicator test
     });
     _startIgnitionStreamSubscription();
   }
 
+  /// Send the command to the ELM327 device
   Future<void> _sendCommand(String command) async {
+    while (_isCommandInProgress) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    _isCommandInProgress = true;
+    _currentCommand = command;
     String fullCommand = "$command\r";
     List<int> bytes = utf8.encode(fullCommand);
-    try {
-      await writeCharacteristic.write(bytes, withoutResponse: true);
-      _logStreamController.add("Sent: $command");
-    } catch (e) {
-      _logStreamController.add("Error sending command '$command': $e");
-      if (command == "ATZ") {
-        _logStreamController.add("Failed to reset ELM327. Disconnecting.");
-        //device.disconnect();
-        // or other logic here for critical commands
-      } else {
-        return Future.error(e);
-      }
-    }
-  }
-
-  void handleReceivedData(List<int> data) {
-    String response = utf8.decode(data).trim().replaceAll(" ", "");
-    _logStreamController.add("Received: $response");
-
-    bool previousState = isIgnitionTurnedOn;
-
-    if (response.contains("ON")) {
-      isIgnitionTurnedOn = true;
-      _ignitionStreamController.add(true);
-      _logStreamController.add("Ignition turned ON");
-    } else if (response.contains("OFF")) {
-      isIgnitionTurnedOn = false;
-      _logStreamController.add("Ignition turned OFF");
-    }
-
-    if (isIgnitionTurnedOn != previousState) {
-      _ignitionStreamController.add(isIgnitionTurnedOn);
-    }
-
-    // Handle VIN once
-    if (response.startsWith("0902")) {
-      carVin = CarUtils.getCarVin(response);
-      _logStreamController.add("VIN received: $carVin");
-      if (_currentVehicleDiagnostics == null && carVin != null) {
-        _currentVehicleDiagnostics = VehicleDiagnostics(
-          vin: carVin!,
-          currentMileage: carMileage ?? 0.0,
-        );
-        _vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
-        _logStreamController.add("VIN set: $_currentVehicleDiagnostics.vin");
-      } else {
-        _logStreamController.add("VIN already set. Ignoring.");
-      }
-    }
-
-    if (response.contains("10E1")) {
-      carMileage = CarUtils.getCarKm(response);
-      _logStreamController.add("Mileage received: $carMileage");
-      if (_currentVehicleDiagnostics != null && carMileage != null) {
-        _currentVehicleDiagnostics = _currentVehicleDiagnostics!.copyWith(
-          currentMileage: carMileage!,
-        );
-        _vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
-        _logStreamController.add(
-            "Mileage updated: ${_currentVehicleDiagnostics!.currentMileage}");
-      } else {
-        _logStreamController.add("Mileage received before VIN. Ignoring.");
-      }
-    }
+    await writeCharacteristic.write(bytes, withoutResponse: true);
+    _logStreamController.add("Sent command: $command");
   }
 
   Future<bool> _checkData() async {
-    await _sendCommand("0902");
-    await Future.delayed(const Duration(milliseconds: 500));
-    await _sendCommand("2210E01");
-    await Future.delayed(const Duration(milliseconds: 500));
+    for (int i = 0; i < 3; i++) {
+      await _sendCommand("0902");
+      await Future.delayed(const Duration(milliseconds: 4000));
+    }
     return dataIsValid = _checkVin() && _checkMileage();
   }
 
+  void handleReceivedData(List<int> data) {
+    String response = utf8
+        .decode(data)
+        .trim()
+        .replaceAll("]", "")
+        .replaceAll("[", "")
+        .replaceAll(">", "")
+        .replaceAll("<", "")
+        .replaceAll(":", "")
+        .replaceAll("SEARCHING", "")
+        .replaceAll(".", "")
+        .replaceAll("STOPPED", "")
+        .replaceAll("NO DATA", "")
+        .replaceAll("TIMEOUT", "")
+        .replaceAll(" ", "");
+    if (response.isEmpty) return;
+    _logStreamController.add("Received: $response");
+
+    if (_currentCommand == null) return;
+    if (_currentCommand!.startsWith("AT")) {
+      _logStreamController.add("Command with AT received");
+    }
+
+    if (_currentCommand == "0101") {
+      if (response.contains("")) {
+        isIgnitionTurnedOn = true;
+        _ignitionStreamController.add(true);
+        _logStreamController.add("Ignition turned ON");
+      } else {
+        isIgnitionTurnedOn = false;
+        _ignitionStreamController.add(false);
+      }
+    }
+
+    if (_currentCommand == "2210E01") {
+      if (response.startsWith("6210")) {
+        carMileage = VehicleUtils.getVehicleKm(response);
+        _logStreamController.add("Mileage received: $carMileage");
+        if (_currentVehicleDiagnostics != null && carMileage != null) {
+          _currentVehicleDiagnostics =
+              _currentVehicleDiagnostics!.copyWith(currentMileage: carMileage!);
+          _vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
+          _logStreamController.add(
+              "Mileage updated: ${_currentVehicleDiagnostics!.currentMileage}");
+        } else {
+          _logStreamController.add("Mileage received before VIN. Ignoring.");
+        }
+      }
+    }
+
+    if (_currentCommand == "0902") {
+      if (response.length >= 17) {
+        carVin = VehicleUtils.getCarVin(response);
+        _logStreamController.add("VIN received: $carVin");
+        if (_currentVehicleDiagnostics == null && carVin != null) {
+          _logStreamController.add("VIN received: $carVin");
+          _currentVehicleDiagnostics = VehicleDiagnostics(
+            vin: carVin!,
+            currentMileage: carMileage ?? 0.0,
+          );
+          //_vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
+          //_logStreamController.add("VIN set:");
+        } else {
+          _logStreamController.add("VIN already set. Ignoring.");
+        }
+      }
+    }
+  }
+
   bool _checkVin() {
+    _logStreamController.add("Checking VIN: $carVin");
     if (carVin != null && carVin!.length == 17) {
       final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
       return vinRegex.hasMatch(carVin!);
@@ -155,6 +171,7 @@ class Elm327Service {
   }
 
   bool _checkMileage() {
+    _logStreamController.add("Checking Mileage: $carMileage");
     if (carMileage != null && carMileage! >= 0 && carMileage! <= 2000000) {
       return true;
     }
@@ -162,6 +179,7 @@ class Elm327Service {
   }
 
   void _startIgnitionStreamSubscription() {
+    _logStreamController.add("Ignition status: $isIgnitionTurnedOn");
     _ignitionStreamController.stream.listen((isIgnitionTurnedOn) async {
       if (isIgnitionTurnedOn) {
         _logStreamController.add("Ignition turned ON");
@@ -205,6 +223,9 @@ class Elm327Service {
       // You can emit data to streams or handle it as needed
     });
     _telemetryStartedController.add(null);
+    if (!isTelemetryRunning) {
+      isTelemetryRunning = true;
+    }
   }
 
   void _endTelemetryCollection() {
@@ -213,6 +234,7 @@ class Elm327Service {
     _logStreamController.add("Trip monitoring ended. Saving trip data.");
     checkIgnitionTimer?.cancel();
     telemetryTimer?.cancel();
+    isTelemetryRunning = false;
     _saveTripData();
   }
 

@@ -1,18 +1,14 @@
-// lib/views/home_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/providers.dart'; // Ensure correct path
-import '../models/trip.dart'; // Adjust as necessary
+import '../providers/providers.dart';
 
 class Home extends ConsumerWidget {
   const Home({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final trip = ref.watch(tripNotifierProvider);
-    final bluetoothService = ref
-        .watch(customBluetoothServiceProvider); // Use watch if UI depends on it
+    final List<String> logs = [];
+    final bluetoothService = ref.watch(customBluetoothServiceProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -26,14 +22,21 @@ class Home extends ConsumerWidget {
               stream: bluetoothService.logStream,
               builder: (context, snapshot) {
                 if (snapshot.hasData) {
-                  return ListView(
-                    children: [
-                      Padding(
+                  // Add new log to the list
+                  logs.add(snapshot.data!);
+
+                  return ListView.builder(
+                    itemCount: logs.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
                         padding: const EdgeInsets.all(8.0),
-                        child: Text(snapshot.data!),
-                      ),
-                    ],
+                        child: Text(logs[index]),
+                      );
+                    },
                   );
+                } else if (snapshot.connectionState ==
+                    ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
                 } else {
                   return const Center(child: Text("No logs available."));
                 }

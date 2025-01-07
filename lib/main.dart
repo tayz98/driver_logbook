@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:elogbook/notification_configuration.dart';
 import 'package:elogbook/objectbox.g.dart';
+import 'package:elogbook/services/log_service.dart';
 
 import 'package:elogbook/views/home_screen.dart';
 import 'package:flutter/material.dart';
@@ -21,12 +22,12 @@ const String portName = 'notification_send_port';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await LogService.initializeLogFile();
   await initializeNotifications();
 
   requestNotificationPermission();
   final appDocDir = await getApplicationDocumentsDirectory();
-  final store = openStore(directory: appDocDir.path);
+  final store = await openStore(directory: appDocDir.path);
 
   FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
   runApp(ProviderScope(
@@ -34,8 +35,16 @@ Future<void> main() async {
       child: const MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatelessWidget with WidgetsBindingObserver {
   const MyApp({super.key});
+
+  void initState() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+  }
 
   @override
   Widget build(BuildContext context) {
