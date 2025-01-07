@@ -5,27 +5,40 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../utils/car_utils.dart';
 import '../models/vehicle_diagnostics.dart';
 
-// TODO: use provider, bloc or riverpod for state managing the vehicle data
 class Elm327Service {
-  final BluetoothDevice device;
-  BluetoothCharacteristic writeCharacteristic;
-  BluetoothCharacteristic notifyCharacteristic;
   final StreamController<String> _logStreamController =
       StreamController<String>.broadcast();
   Stream<String> get logStream => _logStreamController.stream;
-  final StreamController<Vehiclediagnostics> tripDataStreamController =
-      StreamController<Vehiclediagnostics>.broadcast();
-  Stream<Vehiclediagnostics> get tripDataStream =>
-      tripDataStreamController.stream;
-  final StreamController<bool> ignitionStreamController =
+
+  final StreamController<String> _tripDataStreamController =
+      StreamController<String>.broadcast();
+  Stream<String> get tripDataStream => _tripDataStreamController.stream;
+
+  final StreamController<bool> _ignitionStreamController =
       StreamController<bool>.broadcast();
-  bool ignitionIsTurnedOn = false;
+  Stream<bool> get ignitionStream => _ignitionStreamController.stream;
+
+  final StreamController<VehicleDiagnostics>
+      _vehicleDiagnosticsStreamController =
+      StreamController<VehicleDiagnostics>.broadcast();
+  Stream<VehicleDiagnostics> get vehicleStream =>
+      _vehicleDiagnosticsStreamController.stream;
+
+  final StreamController<void> _telemetryStartedController =
+      StreamController<void>.broadcast();
+  Stream<void> get telemetryStartedStream => _telemetryStartedController.stream;
+
+  bool isIgnitionTurnedOn = false;
   bool dataIsValid = false;
   String? carVin;
   double? carMileage;
   Timer? ignitionOffTimer;
   Timer? checkIgnitionTimer;
   late Future<bool> _dataCheckFuture;
+  final BluetoothDevice device;
+  BluetoothCharacteristic writeCharacteristic;
+  BluetoothCharacteristic notifyCharacteristic;
+  VehicleDiagnostics? _currentVehicleDiagnostics;
 
   Elm327Service(
       this.device, this.writeCharacteristic, this.notifyCharacteristic) {
@@ -79,28 +92,48 @@ class Elm327Service {
     String response = utf8.decode(data).trim().replaceAll(" ", "");
     _logStreamController.add("Received: $response");
 
-    bool previousState = ignitionIsTurnedOn;
+    bool previousState = isIgnitionTurnedOn;
 
     if (response.contains("ON")) {
-      ignitionStreamController.add(true);
+      isIgnitionTurnedOn = true;
+      _ignitionStreamController.add(true);
       _logStreamController.add("Ignition turned ON");
     } else if (response.contains("OFF")) {
-      ignitionIsTurnedOn = false;
+      isIgnitionTurnedOn = false;
       _logStreamController.add("Ignition turned OFF");
     }
 
-    if (ignitionIsTurnedOn != previousState) {
-      ignitionStreamController.add(ignitionIsTurnedOn);
+    if (isIgnitionTurnedOn != previousState) {
+      _ignitionStreamController.add(isIgnitionTurnedOn);
     }
 
+    // Handle VIN once
     if (response.startsWith("0902")) {
       carVin = CarUtils.getCarVin(response);
-      _logStreamController.add("VIN: $carVin");
+      if (_currentVehicleDiagnostics == null && carVin != null) {
+        _currentVehicleDiagnostics = VehicleDiagnostics(
+          vin: carVin!,
+          currentMileage: carMileage ?? 0.0,
+        );
+        _vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
+        _logStreamController.add("VIN set: $_currentVehicleDiagnostics.vin");
+      } else {
+        _logStreamController.add("VIN already set. Ignoring.");
+      }
     }
 
     if (response.contains("10E1")) {
       carMileage = CarUtils.getCarKm(response);
-      _logStreamController.add("Mileage: $carMileage");
+      if (_currentVehicleDiagnostics != null && carMileage != null) {
+        _currentVehicleDiagnostics = _currentVehicleDiagnostics!.copyWith(
+          currentMileage: carMileage!,
+        );
+        _vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
+        _logStreamController.add(
+            "Mileage updated: ${_currentVehicleDiagnostics!.currentMileage}");
+      } else {
+        _logStreamController.add("Mileage received before VIN. Ignoring.");
+      }
     }
   }
 
@@ -113,34 +146,23 @@ class Elm327Service {
   }
 
   bool _checkVin() {
-    // Ensure carVin is not null
-    if (carVin != null) {
-      // Check length
-      if (carVin!.length == 17) {
-        // Regex to validate VIN format (excludes I, O, Q)
-        final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
-        if (vinRegex.hasMatch(carVin!)) {
-          return true;
-        }
-      }
+    if (carVin != null && carVin!.length == 17) {
+      final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
+      return vinRegex.hasMatch(carVin!);
     }
     return false;
   }
 
   bool _checkMileage() {
-    // Ensure mileage is not null
-    if (carMileage != null) {
-      // Check if mileage is within a realistic range
-      if (carMileage! >= 0 && carMileage! <= 2000000) {
-        return true;
-      }
+    if (carMileage != null && carMileage! >= 0 && carMileage! <= 2000000) {
+      return true;
     }
-    return false; // Invalid mileage
+    return false;
   }
 
   void _startIgnitionStreamSubscription() {
-    ignitionStreamController.stream.listen((isIgnitionOn) async {
-      if (isIgnitionOn == true) {
+    _ignitionStreamController.stream.listen((isIgnitionTurnedOn) async {
+      if (isIgnitionTurnedOn) {
         _logStreamController.add("Ignition turned ON");
         // Cancel any pending OFF timer
         ignitionOffTimer?.cancel();
@@ -177,10 +199,7 @@ class Elm327Service {
     await _sendCommand("2210E01"); // mileage
     _logStreamController
         .add("Telemetry data collected: VIN: $carVin, Mileage: $carMileage");
-    tripDataStreamController.add(Vehiclediagnostics(
-        vin: carVin!,
-        lastMileageUpdate: DateTime.now(),
-        currentMileage: carMileage!));
+    _telemetryStartedController.add(null);
   }
 
   void _endTelemetryCollection() {
@@ -197,8 +216,13 @@ class Elm327Service {
 
   void dispose() {
     _logStreamController.close();
-    ignitionStreamController.close();
+    _ignitionStreamController.close();
+    _tripDataStreamController.close();
+    _vehicleDiagnosticsStreamController.close();
     ignitionOffTimer?.cancel();
     checkIgnitionTimer?.cancel();
+    _telemetryStartedController.close();
+    ignitionOffTimer = null;
+    checkIgnitionTimer = null;
   }
 }

@@ -27,6 +27,10 @@ class CustomBluetoothService {
   int? rssi;
   int? mtuSize;
   Elm327Service? elm327Service;
+  final StreamController<Elm327Service?> _elm327ServiceStreamController =
+      StreamController<Elm327Service?>.broadcast();
+  Stream<Elm327Service?> get elm327ServiceStream =>
+      _elm327ServiceStreamController.stream;
   final List<String> knownRemoteIds = ["8C:DE:52:DE:CB:DC"];
 
   CustomBluetoothService._internal() {
@@ -135,8 +139,10 @@ class CustomBluetoothService {
       });
       _notifyCharacteristic!.lastValueStream
           .listen(elm327Service!.handleReceivedData);
+      _elm327ServiceStreamController.add(elm327Service);
     } else {
       _logStreamController.add("Required characteristics not found.");
+      _elm327ServiceStreamController.add(null);
     }
   }
 

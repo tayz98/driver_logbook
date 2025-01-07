@@ -120,7 +120,7 @@ final _entities = <obx_int.ModelEntity>[
             type: 11,
             flags: 520,
             indexId: const obx_int.IdUid(2, 7291338709312035993),
-            relationTarget: 'Vehiclediagnostics')
+            relationTarget: 'VehicleDiagnostics')
       ],
       relations: <obx_int.ModelRelation>[],
       backlinks: <obx_int.ModelBacklink>[]),
@@ -202,7 +202,7 @@ final _entities = <obx_int.ModelEntity>[
       backlinks: <obx_int.ModelBacklink>[]),
   obx_int.ModelEntity(
       id: const obx_int.IdUid(7, 8410898522382471687),
-      name: 'Vehiclediagnostics',
+      name: 'VehicleDiagnostics',
       lastPropertyId: const obx_int.IdUid(3, 6580901697177358760),
       flags: 0,
       properties: <obx_int.ModelProperty>[
@@ -385,12 +385,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final gpsParam = obx.ToOne<Gps>(
               targetId:
                   const fb.Int64Reader().vTableGet(buffer, rootOffset, 6, 0));
-          final vehicleDiagnosticsParam = obx.ToOne<Vehiclediagnostics>(
+          final vehicleDiagnosticsParam = obx.ToOne<VehicleDiagnostics>(
               targetId:
                   const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0));
+          final idParam =
+              const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
           final object = Telemetry(
-              gps: gpsParam, vehicleDiagnostics: vehicleDiagnosticsParam)
-            ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
+              gps: gpsParam,
+              vehicleDiagnostics: vehicleDiagnosticsParam,
+              id: idParam);
           object.gps.attach(store);
           object.vehicleDiagnostics.attach(store);
           return object;
@@ -482,15 +485,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
 
           return object;
         }),
-    Vehiclediagnostics: obx_int.EntityDefinition<Vehiclediagnostics>(
+    VehicleDiagnostics: obx_int.EntityDefinition<VehicleDiagnostics>(
         model: _entities[6],
-        toOneRelations: (Vehiclediagnostics object) => [],
-        toManyRelations: (Vehiclediagnostics object) => {},
-        getId: (Vehiclediagnostics object) => object.id,
-        setId: (Vehiclediagnostics object, int id) {
+        toOneRelations: (VehicleDiagnostics object) => [],
+        toManyRelations: (VehicleDiagnostics object) => {},
+        getId: (VehicleDiagnostics object) => object.id,
+        setId: (VehicleDiagnostics object, int id) {
           object.id = id;
         },
-        objectToFB: (Vehiclediagnostics object, fb.Builder fbb) {
+        objectToFB: (VehicleDiagnostics object, fb.Builder fbb) {
           final vinOffset = fbb.writeString(object.vin);
           fbb.startTable(4);
           fbb.addInt64(0, object.id);
@@ -506,7 +509,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
               .vTableGet(buffer, rootOffset, 6, '');
           final currentMileageParam =
               const fb.Float64Reader().vTableGet(buffer, rootOffset, 8, 0);
-          final object = Vehiclediagnostics(
+          final object = VehicleDiagnostics(
               vin: vinParam, currentMileage: currentMileageParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
 
@@ -573,7 +576,7 @@ class Telemetry_ {
 
   /// See [Telemetry.vehicleDiagnostics].
   static final vehicleDiagnostics =
-      obx.QueryRelationToOne<Telemetry, Vehiclediagnostics>(
+      obx.QueryRelationToOne<Telemetry, VehicleDiagnostics>(
           _entities[3].properties[2]);
 }
 
@@ -622,17 +625,17 @@ class TripInformation_ {
       obx.QueryIntegerProperty<TripInformation>(_entities[5].properties[0]);
 }
 
-/// [Vehiclediagnostics] entity fields to define ObjectBox queries.
-class Vehiclediagnostics_ {
-  /// See [Vehiclediagnostics.id].
+/// [VehicleDiagnostics] entity fields to define ObjectBox queries.
+class VehicleDiagnostics_ {
+  /// See [VehicleDiagnostics.id].
   static final id =
-      obx.QueryIntegerProperty<Vehiclediagnostics>(_entities[6].properties[0]);
+      obx.QueryIntegerProperty<VehicleDiagnostics>(_entities[6].properties[0]);
 
-  /// See [Vehiclediagnostics.vin].
+  /// See [VehicleDiagnostics.vin].
   static final vin =
-      obx.QueryStringProperty<Vehiclediagnostics>(_entities[6].properties[1]);
+      obx.QueryStringProperty<VehicleDiagnostics>(_entities[6].properties[1]);
 
-  /// See [Vehiclediagnostics.currentMileage].
+  /// See [VehicleDiagnostics.currentMileage].
   static final currentMileage =
-      obx.QueryDoubleProperty<Vehiclediagnostics>(_entities[6].properties[2]);
+      obx.QueryDoubleProperty<VehicleDiagnostics>(_entities[6].properties[2]);
 }

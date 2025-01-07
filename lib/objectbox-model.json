@@ -101,7 +101,7 @@
           "type": 11,
           "flags": 520,
           "indexId": "2:7291338709312035993",
-          "relationTarget": "Vehiclediagnostics"
+          "relationTarget": "VehicleDiagnostics"
         }
       ],
       "relations": []
@@ -189,7 +189,7 @@
     {
       "id": "7:8410898522382471687",
       "lastPropertyId": "3:6580901697177358760",
-      "name": "Vehiclediagnostics",
+      "name": "VehicleDiagnostics",
       "properties": [
         {
           "id": "1:5745589683350580440",

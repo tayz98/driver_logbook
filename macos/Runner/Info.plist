@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app uses Bluetooth to connect to the ELM327 device.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location is used to enhance Bluetooth connectivity.</string>
 </dict>
 </plist>

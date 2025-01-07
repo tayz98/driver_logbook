@@ -1,69 +1,66 @@
+import 'package:elogbook/providers/providers.dart';
 import 'package:flutter/material.dart';
-import 'package:elogbook/notification_configuration.dart';
-import '../services/custom_bluetooth_service.dart';
-import 'dart:async';
 import '../models/driver.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class Home extends ConsumerStatefulWidget {
-  const Home({super.key});
-
+class Home extends ConsumerWidget {
   @override
-  ConsumerState<Home> createState() => _HomeState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trip = ref.watch(tripNotifierProvider);
+    final tripNotifier = ref.read(tripNotifierProvider.notifier);
+    final bluetoothService = ref.watch(customBluetoothServiceProvider);
 
-class _HomeState extends ConsumerState<Home> {
-  final CustomBluetoothService _bluetoothService = CustomBluetoothService();
-  final List<String> _logs = [];
-  late StreamSubscription<String> _logSubscription;
-  Driver? driver;
-
-  @override
-  void initState() {
-    final driverNotifier = ref.read(driverProvider.notifier);
-    driverNotifier.logIn('1');
-    super.initState();
-    showBasicNotification(
-        title: "TestNotification", body: "This is a test notification");
-    _logSubscription = _bluetoothService.logStream.listen((logMessage) {
-      if (logMessage.isNotEmpty) {
-        setState(() {
-          _logs.add(logMessage);
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _logSubscription.cancel();
-    super.dispose();
-  }
-
-  void checkLogin() {
-    // check if a driver exists in the database
-    // if not give the user the option to create a new driver
-    // if no driver is created, the app should not proceed
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("OBD-II Flutter App"),
+        title: Text("ELM327 Trip Tracker"),
       ),
-      body: _logs.isEmpty
-          ? const Center(child: Text("No logs available"))
-          : Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ListView.builder(
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(_logs[index]),
+      body: Column(
+        children: [
+          // Display Logs
+          Expanded(
+            child: StreamBuilder<String>(
+              stream: bluetoothService.logStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return ListView(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(snapshot.data!),
+                      ),
+                    ],
                   );
-                },
+                } else {
+                  return Center(child: Text("No logs available."));
+                }
+              },
+            ),
+          ),
+          // Trip Controls
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              onPressed: () async {
+                // Example: Set the current driver before starting a trip
+                // You might want to implement a proper driver selection mechanism
+                final driver = Driver(); // Replace with actual driver retrieval
+                tripNotifier.setDriver(driver);
+                tripNotifier.startTrip();
+              },
+              child: Text(trip == null ? "Start Trip" : "End Trip"),
+            ),
+          ),
+          // Display Current Trip Info
+          if (trip != null)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                "Trip Status: ${trip.tripStatus}\nVIN: ${trip.telemetry.target?.vehicleDiagnostics.target?.vin ?? 'N/A'}\nMileage: ${trip.telemetry.target?.vehicleDiagnostics.target?.currentMileage ?? 'N/A'}",
+                textAlign: TextAlign.center,
               ),
             ),
+        ],
+      ),
     );
   }
 }
