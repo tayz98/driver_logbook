@@ -7,14 +7,10 @@ import "package:elogbook/services/elm327_services.dart";
 import "package:riverpod/riverpod.dart";
 import "package:elogbook/repositories/trip_repository.dart";
 import "package:elogbook/repositories/telemetry_repository.dart";
+import 'package:path_provider/path_provider.dart';
 
 final storeProvider = Provider<Store>((ref) {
-  try {
-    return openStore();
-  } catch (e) {
-    print('Failed to open ObjectBox store: $e');
-    throw Exception('Could not initialize ObjectBox store');
-  }
+  throw UnimplementedError(); // This will be overridden in main()
 });
 
 final driverRepositoryProvider = Provider<DriverRepository>((ref) {

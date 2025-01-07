@@ -34,7 +34,7 @@ class Elm327Service {
   double? carMileage;
   Timer? ignitionOffTimer;
   Timer? checkIgnitionTimer;
-  late Future<bool> _dataCheckFuture;
+  Timer? telemetryTimer;
   final BluetoothDevice device;
   BluetoothCharacteristic writeCharacteristic;
   BluetoothCharacteristic notifyCharacteristic;
@@ -61,7 +61,6 @@ class Elm327Service {
       await Future.delayed(const Duration(milliseconds: 500));
     }
     _logStreamController.add("ELM327 Initialized");
-    _dataCheckFuture = _checkData();
     // repeat ignition status check every 4 seconds
     checkIgnitionTimer =
         Timer.periodic(const Duration(seconds: 4), (timer) async {
@@ -110,6 +109,7 @@ class Elm327Service {
     // Handle VIN once
     if (response.startsWith("0902")) {
       carVin = CarUtils.getCarVin(response);
+      _logStreamController.add("VIN received: $carVin");
       if (_currentVehicleDiagnostics == null && carVin != null) {
         _currentVehicleDiagnostics = VehicleDiagnostics(
           vin: carVin!,
@@ -124,6 +124,7 @@ class Elm327Service {
 
     if (response.contains("10E1")) {
       carMileage = CarUtils.getCarKm(response);
+      _logStreamController.add("Mileage received: $carMileage");
       if (_currentVehicleDiagnostics != null && carMileage != null) {
         _currentVehicleDiagnostics = _currentVehicleDiagnostics!.copyWith(
           currentMileage: carMileage!,
@@ -167,7 +168,7 @@ class Elm327Service {
         // Cancel any pending OFF timer
         ignitionOffTimer?.cancel();
         // Validate data and start trip monitoring
-        bool dataIsValid = await _dataCheckFuture;
+        bool dataIsValid = await _checkData();
         if (dataIsValid) {
           _logStreamController.add("Data is valid. Starting trip monitoring.");
           _startTelemetryCollection();
@@ -196,9 +197,13 @@ class Elm327Service {
     showBasicNotification(
         title: "Telemetry", body: "Telemetry collection is running");
     _logStreamController.add("Telemetry collection started");
-    await _sendCommand("2210E01"); // mileage
-    _logStreamController
-        .add("Telemetry data collected: VIN: $carVin, Mileage: $carMileage");
+    // Start a periodic timer to collect telemetry data every X seconds
+    telemetryTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      await _sendCommand("2210E01"); // Request mileage
+      _logStreamController
+          .add("Telemetry data collected: VIN: $carVin, Mileage: $carMileage");
+      // You can emit data to streams or handle it as needed
+    });
     _telemetryStartedController.add(null);
   }
 
@@ -206,6 +211,8 @@ class Elm327Service {
     showBasicNotification(
         title: "Telemetry", body: "Telemetry collection ended");
     _logStreamController.add("Trip monitoring ended. Saving trip data.");
+    checkIgnitionTimer?.cancel();
+    telemetryTimer?.cancel();
     _saveTripData();
   }
 
@@ -224,5 +231,7 @@ class Elm327Service {
     _telemetryStartedController.close();
     ignitionOffTimer = null;
     checkIgnitionTimer = null;
+    telemetryTimer?.cancel();
+    telemetryTimer = null;
   }
 }

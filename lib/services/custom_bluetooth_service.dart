@@ -33,13 +33,10 @@ class CustomBluetoothService {
       _elm327ServiceStreamController.stream;
   final List<String> knownRemoteIds = ["8C:DE:52:DE:CB:DC"];
 
-  CustomBluetoothService._internal() {
+  CustomBluetoothService() {
     FlutterBluePlus.setOptions(restoreState: true);
     _initialize();
   }
-  static final CustomBluetoothService _instance =
-      CustomBluetoothService._internal();
-  factory CustomBluetoothService() => _instance;
 
   _initialize() {
     _scanSubscription = FlutterBluePlus.onScanResults.listen((results) {
@@ -234,5 +231,6 @@ class CustomBluetoothService {
     _isScanningSubscription.cancel();
     _connectionStateSubscription?.cancel();
     elm327Service?.dispose();
+    _elm327ServiceStreamController.close();
   }
 }

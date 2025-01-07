@@ -1,18 +1,22 @@
-import 'package:elogbook/providers/providers.dart';
+// lib/views/home_screen.dart
+
 import 'package:flutter/material.dart';
-import '../models/driver.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/providers.dart'; // Ensure correct path
+import '../models/trip.dart'; // Adjust as necessary
 
 class Home extends ConsumerWidget {
+  const Home({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trip = ref.watch(tripNotifierProvider);
-    final tripNotifier = ref.read(tripNotifierProvider.notifier);
-    final bluetoothService = ref.watch(customBluetoothServiceProvider);
+    final bluetoothService = ref
+        .watch(customBluetoothServiceProvider); // Use watch if UI depends on it
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("ELM327 Trip Tracker"),
+        title: const Text("ELM327 Trip Tracker"),
       ),
       body: Column(
         children: [
@@ -31,34 +35,11 @@ class Home extends ConsumerWidget {
                     ],
                   );
                 } else {
-                  return Center(child: Text("No logs available."));
+                  return const Center(child: Text("No logs available."));
                 }
               },
             ),
           ),
-          // Trip Controls
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: () async {
-                // Example: Set the current driver before starting a trip
-                // You might want to implement a proper driver selection mechanism
-                final driver = Driver(); // Replace with actual driver retrieval
-                tripNotifier.setDriver(driver);
-                tripNotifier.startTrip();
-              },
-              child: Text(trip == null ? "Start Trip" : "End Trip"),
-            ),
-          ),
-          // Display Current Trip Info
-          if (trip != null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                "Trip Status: ${trip.tripStatus}\nVIN: ${trip.telemetry.target?.vehicleDiagnostics.target?.vin ?? 'N/A'}\nMileage: ${trip.telemetry.target?.vehicleDiagnostics.target?.currentMileage ?? 'N/A'}",
-                textAlign: TextAlign.center,
-              ),
-            ),
         ],
       ),
     );

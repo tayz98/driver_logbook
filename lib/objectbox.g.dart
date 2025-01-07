@@ -215,7 +215,8 @@ final _entities = <obx_int.ModelEntity>[
             id: const obx_int.IdUid(2, 2190900124390503031),
             name: 'vin',
             type: 9,
-            flags: 0),
+            flags: 2080,
+            indexId: const obx_int.IdUid(7, 3366582673893933565)),
         obx_int.ModelProperty(
             id: const obx_int.IdUid(3, 6580901697177358760),
             name: 'currentMileage',
@@ -261,7 +262,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
   final model = obx_int.ModelInfo(
       entities: _entities,
       lastEntityId: const obx_int.IdUid(7, 8410898522382471687),
-      lastIndexId: const obx_int.IdUid(6, 2758830007158379056),
+      lastIndexId: const obx_int.IdUid(7, 3366582673893933565),
       lastRelationId: const obx_int.IdUid(1, 8053518692451467066),
       lastSequenceId: const obx_int.IdUid(0, 0),
       retiredEntityUids: const [],
