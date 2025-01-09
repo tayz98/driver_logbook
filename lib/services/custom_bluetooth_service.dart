@@ -1,115 +1,207 @@
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
-import '../utils/extra.dart';
 import 'elm327_services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CustomBluetoothService {
+  // Streams
   final StreamController<String> _logStreamController =
       StreamController<String>.broadcast();
   Stream<String> get logStream => _logStreamController.stream;
 
+  // Subscriptions
+  StreamSubscription<int>? _rssiStreamSubscription;
+  StreamSubscription<OnConnectionStateChangedEvent>?
+      _connectionStateSubscription;
+  // Bluetooth
   BluetoothDevice? _connectedDevice;
-  BluetoothConnectionState _connectionState =
-      BluetoothConnectionState.disconnected;
+  BluetoothDevice? _lastConnectedDevice;
   BluetoothCharacteristic? _writeCharacteristic;
   BluetoothCharacteristic? _notifyCharacteristic;
-  StreamSubscription<int>? _mtuSubscription;
-  StreamSubscription<int>? _rssiStreamSubscription;
-  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
-  late StreamSubscription<List<ScanResult>> _scanSubscription;
-  late StreamSubscription<bool> _isScanningSubscription;
+  BluetoothConnectionState? _connectionState;
   final Guid _targetService = Guid("0000fff0-0000-1000-8000-00805f9b34fb");
+
+  // Elm327
+  Elm327Service? elm327Service;
+
+  // misc variables
+  final String _targetAdvName = "VEEPEAK";
   Timer? _disconnectTimer;
   final int _disconnectRssiThreshold = -150;
-  final int _connectRssiThreshold = -90;
-  bool _isConnecting = false;
-  bool _isScanning = false;
-  int? rssi;
-  int? mtuSize;
-  Elm327Service? elm327Service;
-  final StreamController<Elm327Service?> _elm327ServiceStreamController =
-      StreamController<Elm327Service?>.broadcast();
-  Stream<Elm327Service?> get elm327ServiceStream =>
-      _elm327ServiceStreamController.stream;
-  final List<String> knownRemoteIds = ["8C:DE:52:DE:CB:DC"];
+  late SharedPreferences prefs;
+  //final int _rssiTresholdForElm327Service = -100;
 
   CustomBluetoothService() {
     FlutterBluePlus.setOptions(restoreState: true);
     _initialize();
   }
 
-  _initialize() {
-    _scanSubscription = FlutterBluePlus.onScanResults.listen((results) async {
-      for (ScanResult r in results) {
-        if (knownRemoteIds.contains(r.device.remoteId.str)) {
-          if (r.rssi > _connectRssiThreshold &&
-              _isConnecting == false &&
-              _connectedDevice == null) {
-            _logStreamController
-                .add("Found Device has acceptable RSSI: ${r.rssi}");
-            await _connectToDevice(r.device);
-            break;
-          }
-        }
-      }
-    }, onError: (e) {
-      _logStreamController.add("Scan error: $e");
-    });
-    _isScanningSubscription = FlutterBluePlus.isScanning.listen((state) {
-      _isScanning = state;
-      if (!_isScanning && _connectedDevice == null && !_isConnecting) {
-        FlutterBluePlus.startScan(
-            timeout: const Duration(seconds: 10), continuousUpdates: true);
+  Future<void> _initialize() async {
+    prefs = await SharedPreferences.getInstance();
+    await _loadSavedDeviceIds();
+    await _fetchDevicesFromIds();
+
+    _connectionStateSubscription =
+        FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {
+      _connectionState = event.connectionState;
+      if (_connectionState == BluetoothConnectionState.connected) {
+        _logStreamController.add(
+            "Connected to ${event.device.remoteId.str} and Name: ${event.device.advName}.");
+        _connectedDevice = event.device;
+        //final int currentRssi = await _connectedDevice!.readRssi();
+        // if (currentRssi < _rssiTresholdForElm327Service) {
+        //   _logStreamController
+        //       .add("RSSI below threshold for ELM327 Service. Disconnecting...");
+        //   _connectionState = BluetoothConnectionState.disconnected;
+        // }
+        await _requestMtu(_connectedDevice!); // not supported on iOS
+        await _discoverCharacteristics(_connectedDevice!);
+        _trackRssi(
+            dev: _connectedDevice!, interval: const Duration(seconds: 5));
+      } else if (_connectionState == BluetoothConnectionState.disconnected) {
+        _logStreamController
+            .add("Disconnected from ${event.device.remoteId.str}");
+        await _disposeConnection(_connectedDevice!);
+
+        // needed because when disconnect() is used on autoConnect
+        // the device is not auto connecting anymore
+        await _lastConnectedDevice?.connect(autoConnect: true, mtu: null);
       }
     });
   }
 
-  Future<void> _connectToDevice(BluetoothDevice device) async {
-    if (_isConnecting || _connectedDevice != null) {
+  void dispose() {
+    _logStreamController.close();
+    _connectionStateSubscription?.cancel();
+    _rssiStreamSubscription?.cancel();
+    _lastConnectedDevice?.disconnect();
+  }
+
+  Future<void> _disposeConnection(BluetoothDevice dev) async {
+    _lastConnectedDevice = dev;
+    elm327Service?.dispose();
+    _connectedDevice = null;
+    _writeCharacteristic = null;
+    _notifyCharacteristic = null;
+    await _rssiStreamSubscription?.cancel();
+    await dev.disconnect();
+  }
+
+  Stream<int> _rssiStream(BluetoothDevice device, Duration interval) async* {
+    while (true) {
+      try {
+        int rssiValue = await device.readRssi();
+        yield rssiValue;
+      } catch (e) {
+        _logStreamController.add("Error reading RSSI: $e");
+        break;
+      }
+      await Future.delayed(interval);
+    }
+  }
+
+  void _trackRssi({required BluetoothDevice dev, required Duration interval}) {
+    _rssiStreamSubscription = _rssiStream(dev, interval).listen((rssiValue) {
+      if (rssiValue < _disconnectRssiThreshold) {
+        if (_disconnectTimer == null) {
+          _logStreamController
+              .add("RSSI below threshold. Starting disconnect timer...");
+          _disconnectTimer = Timer(const Duration(seconds: 5), () {
+            _logStreamController.add("Disconnecting due to low RSSI.");
+            _disconnectTimer = null;
+            _connectionState = BluetoothConnectionState.disconnected;
+          });
+        }
+      } else {
+        if (_disconnectTimer != null) {
+          _logStreamController
+              .add("RSSI above threshold. Cancelling disconnect timer.");
+          _disconnectTimer?.cancel();
+          _disconnectTimer = null;
+        }
+      }
+    }, onError: (error) {
+      _logStreamController.add("RSSI Stream Error: $error");
+    });
+  }
+
+  Future<void> _fetchDevicesFromIds() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (prefs.getStringList('knownRemoteIds') == null) {
+      _logStreamController.add("Storage with IDs empty");
       return;
     }
-    _isConnecting = true;
-    try {
-      _logStreamController.add("Connecting to ${device.remoteId}...");
-      // Initiate connection
-      await device.connectAndUpdateStream().catchError((e) {
-        _logStreamController.add("Connection error: $e");
-        _isConnecting = false;
-        return;
-      });
-      _connectionStateSubscription =
-          device.connectionState.listen((state) async {
-        _connectionState = state;
-        _logStreamController.add("Connection State: $state");
-        if (_connectionState == BluetoothConnectionState.connected) {
-          _connectedDevice = device;
-          _mtuSubscription = _connectedDevice!.mtu.listen((mtu) {
-            mtuSize = mtu;
-            _logStreamController.add("MTU Size: $mtu");
-          });
-          await _requestMtu();
-          await _discoverServices();
-          _startRssiMonitoring(const Duration(seconds: 3));
-          _logStreamController.add("Connected to ${device.advName}");
-        }
-        if (_connectionState == BluetoothConnectionState.disconnected) {
-          _disconnectDevice();
-          _logStreamController.add("Disconnected from ${device.remoteId}");
-          _isConnecting = false;
-        }
-      });
-    } catch (e) {
-      _isConnecting = false;
-      _logStreamController.add("Connection error: $e");
+
+    for (var id in prefs.getStringList('knownRemoteIds')!) {
+      _logStreamController.add("Attempting to connect to device ID: $id");
+      try {
+        final device = BluetoothDevice.fromId(id);
+        await device.connect(autoConnect: true, mtu: null);
+        _logStreamController.add("Connected to device ID: $id");
+      } catch (e) {
+        _logStreamController
+            .add("Failed to connect to device ID: $id. Error: $e");
+      }
     }
   }
 
-  Future<void> _discoverServices() async {
-    if (_connectedDevice == null) return;
-    List<BluetoothService> services =
-        await _connectedDevice!.discoverServices();
+  Future<void> _saveDeviceIds(List<String> deviceIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getStringList('knownRemoteIds') == null) {
+      await prefs.setStringList('knownRemoteIds', []);
+      _logStreamController.add("Created knownRemoteIds list.");
+    }
+    final List<String> knownRemoteIds = prefs.getStringList('knownRemoteIds')!;
+    for (var id in deviceIds) {
+      if (!knownRemoteIds.contains(id)) {
+        knownRemoteIds.add(id);
+        _logStreamController.add("Saved device ID: $id");
+      }
+    }
+    await prefs.setStringList('knownRemoteIds', knownRemoteIds);
+  }
+
+  Future<void> _loadSavedDeviceIds() async {
+    prefs.getStringList('knownRemoteIds') ?? [];
+  }
+
+  Future<void> scanForDevices() async {
+    final List<String> deviceIds = [];
+    _logStreamController.add("Starting scan...");
+
+    try {
+      await FlutterBluePlus.startScan(
+          withServices: [_targetService],
+          withNames: [_targetAdvName],
+          timeout: const Duration(seconds: 5));
+      FlutterBluePlus.scanResults.listen((results) async {
+        for (var result in results) {
+          _logStreamController.add("Found Device: ${result.device.advName}");
+          _logStreamController.add("Device ID: ${result.device.remoteId.str}");
+          deviceIds.add(result.device.remoteId.str);
+        }
+      });
+      _logStreamController.add("Scan completed.");
+      await _saveDeviceIds(deviceIds);
+      await _fetchDevicesFromIds();
+    } catch (e) {
+      _logStreamController.add("Error during scanning: $e");
+    }
+  }
+
+  Future<void> _requestMtu(BluetoothDevice dev) async {
+    try {
+      await dev.requestMtu(128, predelay: 0);
+      _logStreamController.add("Requested MTU Size: 128");
+    } catch (e) {
+      _logStreamController.add("Error requesting MTU: $e");
+    }
+  }
+
+  Future<void> _discoverCharacteristics(BluetoothDevice dev) async {
+    List<BluetoothService> services = await dev.discoverServices();
     for (BluetoothService service in services) {
-      print(service.uuid.toString());
       if (service.uuid == _targetService) {
         for (BluetoothCharacteristic c in service.characteristics) {
           if (c.properties.write) {
@@ -137,110 +229,6 @@ class CustomBluetoothService {
       });
       _notifyCharacteristic!.lastValueStream
           .listen(elm327Service!.handleReceivedData);
-    } else {
-      _logStreamController.add("Required characteristics not found.");
-      _disconnectDevice();
     }
-  }
-
-  Future<void> _requestMtu() async {
-    if (_connectedDevice == null) return;
-    try {
-      await _connectedDevice!.requestMtu(223, predelay: 0);
-      _logStreamController.add("Requested MTU Size: 223");
-    } catch (e) {
-      _logStreamController.add("Error requesting MTU: $e");
-    }
-  }
-
-  Future<void> _disconnectDevice() async {
-    try {
-      _logStreamController
-          .add("Disconnecting from ${_connectedDevice!.remoteId}...");
-      if (_connectedDevice != null) {
-        stopRssiMonitoring();
-        if (_mtuSubscription != null) {
-          _mtuSubscription?.cancel();
-          _mtuSubscription = null;
-        }
-        if (_connectionStateSubscription != null) {
-          _connectionStateSubscription?.cancel();
-          _connectionStateSubscription = null;
-        }
-        await _connectedDevice!.disconnectAndUpdateStream(queue: true);
-        _connectedDevice = null;
-        elm327Service?.dispose();
-      }
-      //_connectedDevice!.cancelWhenDisconnected(_connectionStateSubscription!,
-      //    delayed: true, next: true);
-      _writeCharacteristic = null;
-      _notifyCharacteristic = null;
-      _connectedDevice = null;
-      _logStreamController.add("Disconnected successfully.");
-    } catch (e) {
-      _logStreamController.add("Error disconnecting: $e");
-    }
-  }
-
-  Stream<int> _rssiStream(BluetoothDevice device, Duration interval) async* {
-    while (true) {
-      try {
-        int rssiValue = await device.readRssi();
-        yield rssiValue;
-      } catch (e) {
-        _logStreamController.add("Error reading RSSI: $e");
-        await _disconnectDevice();
-        break;
-      }
-      await Future.delayed(interval);
-    }
-  }
-
-  void _startRssiMonitoring(Duration interval) {
-    if (_connectedDevice == null) return;
-    _rssiStreamSubscription =
-        _rssiStream(_connectedDevice!, interval).listen((rssiValue) {
-      //_logStreamController.add("RSSI: $rssiValue");
-      if (rssiValue < _disconnectRssiThreshold) {
-        if (_disconnectTimer == null) {
-          _logStreamController
-              .add("RSSI below threshold. Starting disconnect timer...");
-          _disconnectTimer = Timer(const Duration(seconds: 5), () {
-            _logStreamController.add("Disconnecting due to low RSSI.");
-            _disconnectTimer = null;
-            _disconnectDevice();
-          });
-        }
-      } else {
-        if (_disconnectTimer != null) {
-          _logStreamController
-              .add("RSSI above threshold. Cancelling disconnect timer.");
-          _disconnectTimer?.cancel();
-          _disconnectTimer = null;
-        }
-      }
-    }, onError: (error) {
-      _logStreamController.add("RSSI Stream Error: $error");
-      _disconnectDevice();
-    }, onDone: () {
-      _logStreamController.add("RSSI Stream Done");
-    });
-  }
-
-  void stopRssiMonitoring() {
-    _disconnectTimer?.cancel();
-    _disconnectTimer = null;
-    _rssiStreamSubscription?.cancel();
-    _rssiStreamSubscription = null;
-  }
-
-  void dispose() {
-    _logStreamController.close();
-    _mtuSubscription?.cancel();
-    _scanSubscription.cancel();
-    _isScanningSubscription.cancel();
-    _connectionStateSubscription?.cancel();
-    elm327Service?.dispose();
-    _elm327ServiceStreamController.close();
   }
 }

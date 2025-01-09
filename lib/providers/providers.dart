@@ -27,12 +27,15 @@ final telemetryRepositoryProvider = Provider<TelemetryRepository>((ref) {
   return TelemetryRepository(store);
 });
 
-final customBluetoothServiceProvider = Provider<CustomBluetoothService>((ref) {
-  final service = CustomBluetoothService();
-  ref.onDispose(() {
-    service.dispose();
-  });
-  return service;
-});
+final customBluetoothServiceProvider = Provider<CustomBluetoothService>(
+  (ref) {
+    final service = CustomBluetoothService();
+    ref.onDispose(() {
+      service.dispose(); // Ensure proper cleanup
+    });
+    return service;
+  },
+  name: "customBluetoothServiceProvider",
+);
 
 // TODO: tripProvider
