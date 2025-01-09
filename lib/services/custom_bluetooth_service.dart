@@ -1,3 +1,6 @@
+library telmetry_services;
+
+import 'package:elogbook/utils/extra.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
 import 'elm327_services.dart';
@@ -13,11 +16,18 @@ class CustomBluetoothService {
   StreamSubscription<int>? _rssiStreamSubscription;
   StreamSubscription<OnConnectionStateChangedEvent>?
       _connectionStateSubscription;
+  StreamSubscription<List<ScanResult>>? _scanResultsSubscription;
+
   // Bluetooth
   BluetoothDevice? _connectedDevice;
+  BluetoothDevice? get connectedDevice => _connectedDevice;
   BluetoothDevice? _lastConnectedDevice;
+  List<BluetoothDevice> _devices = [];
+  List<ScanResult> _scanResults = [];
   BluetoothCharacteristic? _writeCharacteristic;
+  BluetoothCharacteristic? get writeCharacteristic => _writeCharacteristic;
   BluetoothCharacteristic? _notifyCharacteristic;
+  BluetoothCharacteristic? get notifyCharacteristic => _notifyCharacteristic;
   BluetoothConnectionState? _connectionState;
   final Guid _targetService = Guid("0000fff0-0000-1000-8000-00805f9b34fb");
 
@@ -29,10 +39,12 @@ class CustomBluetoothService {
   Timer? _disconnectTimer;
   final int _disconnectRssiThreshold = -150;
   late SharedPreferences prefs;
-  //final int _rssiTresholdForElm327Service = -100;
+  List<String>? knownRemoteIds;
+  final int _rssiTresholdForElm327Service = -70;
 
   CustomBluetoothService() {
     FlutterBluePlus.setOptions(restoreState: true);
+    FlutterBluePlus.setLogLevel(LogLevel.verbose);
     _initialize();
   }
 
@@ -41,19 +53,19 @@ class CustomBluetoothService {
     await _loadSavedDeviceIds();
     await _fetchDevicesFromIds();
 
-    _connectionStateSubscription =
+    _connectionStateSubscription ??=
         FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {
       _connectionState = event.connectionState;
       if (_connectionState == BluetoothConnectionState.connected) {
         _logStreamController.add(
             "Connected to ${event.device.remoteId.str} and Name: ${event.device.advName}.");
         _connectedDevice = event.device;
-        //final int currentRssi = await _connectedDevice!.readRssi();
-        // if (currentRssi < _rssiTresholdForElm327Service) {
-        //   _logStreamController
-        //       .add("RSSI below threshold for ELM327 Service. Disconnecting...");
-        //   _connectionState = BluetoothConnectionState.disconnected;
-        // }
+        final int currentRssi = await _connectedDevice!.readRssi();
+        if (currentRssi < _rssiTresholdForElm327Service) {
+          _logStreamController
+              .add("RSSI below threshold for ELM327 Service. Disconnecting...");
+          _connectionState = BluetoothConnectionState.disconnected;
+        }
         await _requestMtu(_connectedDevice!); // not supported on iOS
         await _discoverCharacteristics(_connectedDevice!);
         _trackRssi(
@@ -65,26 +77,32 @@ class CustomBluetoothService {
 
         // needed because when disconnect() is used on autoConnect
         // the device is not auto connecting anymore
-        await _lastConnectedDevice?.connect(autoConnect: true, mtu: null);
+        _lastConnectedDevice?.connectAndUpdateStream();
       }
+    });
+
+    _scanResultsSubscription ??= FlutterBluePlus.scanResults.listen((results) {
+      _scanResults = results;
     });
   }
 
   void dispose() {
     _logStreamController.close();
     _connectionStateSubscription?.cancel();
+    elm327Service?.dispose();
     _rssiStreamSubscription?.cancel();
     _lastConnectedDevice?.disconnect();
+    _devices = [];
+    _scanResultsSubscription?.cancel();
   }
 
   Future<void> _disposeConnection(BluetoothDevice dev) async {
     _lastConnectedDevice = dev;
-    elm327Service?.dispose();
     _connectedDevice = null;
     _writeCharacteristic = null;
     _notifyCharacteristic = null;
     await _rssiStreamSubscription?.cancel();
-    await dev.disconnect();
+    await dev.disconnectAndUpdateStream();
   }
 
   Stream<int> _rssiStream(BluetoothDevice device, Duration interval) async* {
@@ -126,64 +144,59 @@ class CustomBluetoothService {
   }
 
   Future<void> _fetchDevicesFromIds() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    if (prefs.getStringList('knownRemoteIds') == null) {
-      _logStreamController.add("Storage with IDs empty");
+    if (knownRemoteIds!.isEmpty) {
+      _logStreamController.add("No known device IDs found.");
+      print("No known device IDs found.");
       return;
     }
-
-    for (var id in prefs.getStringList('knownRemoteIds')!) {
-      _logStreamController.add("Attempting to connect to device ID: $id");
-      try {
-        final device = BluetoothDevice.fromId(id);
-        await device.connect(autoConnect: true, mtu: null);
-        _logStreamController.add("Connected to device ID: $id");
-      } catch (e) {
-        _logStreamController
-            .add("Failed to connect to device ID: $id. Error: $e");
+    try {
+      for (var id in knownRemoteIds!) {
+        if (_devices.any((device) => device.remoteId.str == id)) {
+          _logStreamController.add("Device already fetched: $id");
+          continue; // Skip to the next device ID
+        }
+        try {
+          final device = BluetoothDevice.fromId(id);
+          _logStreamController.add("Fetching device ID: $id");
+          print("Fetching device ID: $id");
+          _devices.add(device);
+          await device.connectAndUpdateStream();
+          await Future.delayed(const Duration(seconds: 1));
+        } catch (e) {
+          _logStreamController
+              .add("Failed to connect to device ID: $id. Error: $e");
+        }
       }
+    } catch (e) {
+      _logStreamController.add("Error fetching devices: $e");
     }
   }
 
   Future<void> _saveDeviceIds(List<String> deviceIds) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getStringList('knownRemoteIds') == null) {
-      await prefs.setStringList('knownRemoteIds', []);
-      _logStreamController.add("Created knownRemoteIds list.");
-    }
-    final List<String> knownRemoteIds = prefs.getStringList('knownRemoteIds')!;
     for (var id in deviceIds) {
-      if (!knownRemoteIds.contains(id)) {
-        knownRemoteIds.add(id);
+      if (!knownRemoteIds!.contains(id)) {
+        knownRemoteIds!.add(id);
         _logStreamController.add("Saved device ID: $id");
       }
     }
-    await prefs.setStringList('knownRemoteIds', knownRemoteIds);
+    await prefs.setStringList('knownRemoteIds', knownRemoteIds!);
   }
 
   Future<void> _loadSavedDeviceIds() async {
-    prefs.getStringList('knownRemoteIds') ?? [];
+    knownRemoteIds = prefs.getStringList('knownRemoteIds') ?? [];
   }
 
   Future<void> scanForDevices() async {
-    final List<String> deviceIds = [];
     _logStreamController.add("Starting scan...");
 
     try {
       await FlutterBluePlus.startScan(
           withServices: [_targetService],
           withNames: [_targetAdvName],
-          timeout: const Duration(seconds: 5));
-      FlutterBluePlus.scanResults.listen((results) async {
-        for (var result in results) {
-          _logStreamController.add("Found Device: ${result.device.advName}");
-          _logStreamController.add("Device ID: ${result.device.remoteId.str}");
-          deviceIds.add(result.device.remoteId.str);
-        }
-      });
-      _logStreamController.add("Scan completed.");
-      await _saveDeviceIds(deviceIds);
+          timeout: const Duration(seconds: 4));
+      await Future.delayed(const Duration(milliseconds: 4100));
+      await _saveDeviceIds(
+          _scanResults.map((r) => r.device.remoteId.str).toList());
       await _fetchDevicesFromIds();
     } catch (e) {
       _logStreamController.add("Error during scanning: $e");
@@ -217,14 +230,10 @@ class CustomBluetoothService {
     }
 
     if (_writeCharacteristic != null && _notifyCharacteristic != null) {
-      elm327Service ??= Elm327Service(
-        _connectedDevice!,
-        _writeCharacteristic!,
-        _notifyCharacteristic!,
-      );
+      elm327Service ??= Elm327Service(this);
       _logStreamController.add("Characteristics ready. Initializing Dongle...");
       await _notifyCharacteristic!.setNotifyValue(true);
-      elm327Service?.logStream.listen((logMessage) {
+      elm327Service?.elm327LogStream.listen((logMessage) {
         _logStreamController.add(logMessage);
       });
       _notifyCharacteristic!.lastValueStream

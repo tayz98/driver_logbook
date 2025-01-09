@@ -6,7 +6,7 @@ class VehicleDiagnostics {
   int id = 0;
   @Unique()
   final String vin;
-  double currentMileage;
+  int currentMileage;
 
   VehicleDiagnostics({
     required this.vin,
@@ -15,7 +15,7 @@ class VehicleDiagnostics {
 
   VehicleDiagnostics copyWith({
     String? vin,
-    double? currentMileage,
+    int? currentMileage,
   }) {
     return VehicleDiagnostics(
       vin: vin ?? this.vin,

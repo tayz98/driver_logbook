@@ -13,7 +13,7 @@ class VehicleUtils {
 
   /// Parses the last 4 hex characters of [response] into an integer.
   /// Returns 0 if parsing fails or if the response is too short.
-  static double getVehicleKm(String response) {
+  static int getVehicleKm(String response) {
     // Validate input length
     // Validate input length
     if (response.length < 8) {
@@ -34,47 +34,35 @@ class VehicleUtils {
       print("Kilometers (Decimal): $kilometers");
 
       // Return the result as a double
-      return kilometers.toDouble();
+      return kilometers;
     } catch (e) {
       throw FormatException("Invalid hex value in response: $last4Bytes");
     }
   }
 
-  /// Removes all occurrences of "7E8", spaces, and ".",
-  /// then strips out "21" at index 16 and "22" at index 30 (if present),
-  /// and finally converts the last 17 bytes (34 hex chars) to ASCII.
-  static String getCarVin(String response) {
-    // Remove any frame headers like 10, 21, 22, etc.
-    final cleanedResponse = _removeFrameIndicators(response);
+  static String getVehicleVin(String response) {
+    // Step 1: Remove "7E8" and spaces if present
+    String cleanedInput = response.replaceAll("7E8", "").replaceAll(" ", "");
 
-    print("Cleaned HEX (without frame indicators): $cleanedResponse");
-
-    // Convert cleaned HEX to ASCII
-    final asciiResult = hexToAscii(cleanedResponse);
-
-    print("ASCII: $asciiResult");
-
-    return asciiResult.trim(); // Trim to remove any trailing spaces
-  }
-
-  // Helper method to remove frame indicators
-  static String _removeFrameIndicators(String hexResponse) {
-    const int frameSize = 16; // Each frame is 16 hex characters (8 bytes)
-    final buffer = StringBuffer();
-
-    for (int i = 0; i < hexResponse.length; i += frameSize) {
-      // Extract the current frame
-      final frame = hexResponse.substring(
-        i,
-        (i + frameSize > hexResponse.length)
-            ? hexResponse.length
-            : i + frameSize,
-      );
-
-      // Skip the first 2 characters (frame indicator) and append the rest
-      buffer.write(frame.substring(2));
+    // Step 2: Split the cleaned input into 8-byte OBD packages
+    List<String> packages = [];
+    for (int i = 0; i < cleanedInput.length; i += 16) {
+      // 8 bytes = 16 hex chars
+      packages.add(cleanedInput.substring(i, i + 16));
     }
 
-    return buffer.toString(); // Return the cleaned response
+    // Step 3: Remove the frame type field (first byte) from each package
+    List<String> processedPackages = packages.map((package) {
+      return package.substring(2); // Remove the first byte (2 hex chars)
+    }).toList();
+
+    // Step 4: Join the cleaned packages and extract the last 17 bytes (34 hex chars)
+    String combinedHex = processedPackages.join();
+    String last17Bytes = combinedHex.substring(combinedHex.length - 34);
+
+    // Step 5: Convert the last 17 bytes (34 hex chars) to ASCII
+    String asciiResult = hexToAscii(last17Bytes);
+
+    return asciiResult;
   }
 }

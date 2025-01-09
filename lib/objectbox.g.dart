@@ -160,12 +160,12 @@ final _entities = <obx_int.ModelEntity>[
         obx_int.ModelProperty(
             id: const obx_int.IdUid(5, 6219580597257460309),
             name: 'startMileage',
-            type: 8,
+            type: 6,
             flags: 0),
         obx_int.ModelProperty(
             id: const obx_int.IdUid(6, 6013629179958562458),
             name: 'endMileage',
-            type: 8,
+            type: 6,
             flags: 0),
         obx_int.ModelProperty(
             id: const obx_int.IdUid(7, 8920345630354971422),
@@ -221,7 +221,7 @@ final _entities = <obx_int.ModelEntity>[
         obx_int.ModelProperty(
             id: const obx_int.IdUid(3, 6580901697177358760),
             name: 'currentMileage',
-            type: 8,
+            type: 6,
             flags: 0)
       ],
       relations: <obx_int.ModelRelation>[],
@@ -422,8 +422,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fbb.addInt64(1, object.tripInformation.targetId);
           fbb.addInt64(2, object.startLocation.targetId);
           fbb.addInt64(3, object.endLocation.targetId);
-          fbb.addFloat64(4, object.startMileage);
-          fbb.addFloat64(5, object.endMileage);
+          fbb.addInt64(4, object.startMileage);
+          fbb.addInt64(5, object.endMileage);
           fbb.addInt64(6, object.telemetry.targetId);
           fbb.addOffset(7, tripCategoryOffset);
           fbb.addOffset(8, tripStatusOffset);
@@ -442,7 +442,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final tripStatusParam = const fb.StringReader(asciiOptimization: true)
               .vTableGet(buffer, rootOffset, 20, '');
           final startMileageParam =
-              const fb.Float64Reader().vTableGet(buffer, rootOffset, 12, 0);
+              const fb.Int64Reader().vTableGet(buffer, rootOffset, 12, 0);
           final tripCategoryParam =
               const fb.StringReader(asciiOptimization: true)
                   .vTableGet(buffer, rootOffset, 18, '');
@@ -453,7 +453,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
               startMileage: startMileageParam,
               tripCategory: tripCategoryParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
-            ..endMileage = const fb.Float64Reader()
+            ..endMileage = const fb.Int64Reader()
                 .vTableGetNullable(buffer, rootOffset, 14);
           object.tripInformation.targetId =
               const fb.Int64Reader().vTableGet(buffer, rootOffset, 6, 0);
@@ -501,7 +501,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fbb.startTable(4);
           fbb.addInt64(0, object.id);
           fbb.addOffset(1, vinOffset);
-          fbb.addFloat64(2, object.currentMileage);
+          fbb.addInt64(2, object.currentMileage);
           fbb.finish(fbb.endTable());
           return object.id;
         },
@@ -511,7 +511,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final vinParam = const fb.StringReader(asciiOptimization: true)
               .vTableGet(buffer, rootOffset, 6, '');
           final currentMileageParam =
-              const fb.Float64Reader().vTableGet(buffer, rootOffset, 8, 0);
+              const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0);
           final object = VehicleDiagnostics(
               vin: vinParam, currentMileage: currentMileageParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
@@ -602,11 +602,11 @@ class Trip_ {
 
   /// See [Trip.startMileage].
   static final startMileage =
-      obx.QueryDoubleProperty<Trip>(_entities[4].properties[4]);
+      obx.QueryIntegerProperty<Trip>(_entities[4].properties[4]);
 
   /// See [Trip.endMileage].
   static final endMileage =
-      obx.QueryDoubleProperty<Trip>(_entities[4].properties[5]);
+      obx.QueryIntegerProperty<Trip>(_entities[4].properties[5]);
 
   /// See [Trip.telemetry].
   static final telemetry =
@@ -640,5 +640,5 @@ class VehicleDiagnostics_ {
 
   /// See [VehicleDiagnostics.currentMileage].
   static final currentMileage =
-      obx.QueryDoubleProperty<VehicleDiagnostics>(_entities[6].properties[2]);
+      obx.QueryIntegerProperty<VehicleDiagnostics>(_entities[6].properties[2]);
 }

@@ -42,7 +42,7 @@ class TripNotifier extends StateNotifier<Trip?> {
       startLocation: ToOne<Location>(),
       telemetry: ToOne<Telemetry>(),
       tripStatus: "inProgress",
-      startMileage: _elm327Service?.carMileage ?? 0,
+      startMileage: _elm327Service?.vehicleMileage ?? 0,
       tripCategory: "business",
     );
 

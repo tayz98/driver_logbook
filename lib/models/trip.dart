@@ -15,8 +15,8 @@ class Trip {
   final startLocation = ToOne<Location>();
   final endLocation = ToOne<Location?>();
 
-  double startMileage;
-  double? endMileage;
+  int startMileage;
+  int? endMileage;
   String tripCategory;
   String tripStatus;
   final telemetry = ToOne<Telemetry>();

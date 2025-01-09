@@ -144,12 +144,12 @@
         {
           "id": "5:6219580597257460309",
           "name": "startMileage",
-          "type": 8
+          "type": 6
         },
         {
           "id": "6:6013629179958562458",
           "name": "endMileage",
-          "type": 8
+          "type": 6
         },
         {
           "id": "7:8920345630354971422",
@@ -207,7 +207,7 @@
         {
           "id": "3:6580901697177358760",
           "name": "currentMileage",
-          "type": 8
+          "type": 6
         }
       ],
       "relations": []
