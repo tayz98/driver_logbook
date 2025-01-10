@@ -4,7 +4,6 @@ import './location.dart';
 import './trip_information.dart';
 import './trip_status.dart';
 import './trip_category.dart';
-import './telemetry.dart';
 
 @Entity()
 class Trip {
@@ -19,14 +18,16 @@ class Trip {
   int? endMileage;
   String tripCategory;
   String tripStatus;
-  final telemetry = ToOne<Telemetry>();
+  String vin;
+  String startTimestamp = DateTime.now().toIso8601String();
+  String? endTimestamp;
 
   Trip({
     required ToOne<Location> startLocation,
-    required ToOne<Telemetry> telemetry,
     required this.tripStatus,
     required this.startMileage,
     required this.tripCategory,
+    required this.vin,
   });
 
   TripCategory get tripCategoryEnum =>

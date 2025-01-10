@@ -152,14 +152,6 @@
           "type": 6
         },
         {
-          "id": "7:8920345630354971422",
-          "name": "telemetryId",
-          "type": 11,
-          "flags": 520,
-          "indexId": "6:2758830007158379056",
-          "relationTarget": "Telemetry"
-        },
-        {
           "id": "8:350530437595885314",
           "name": "tripCategory",
           "type": 9
@@ -220,8 +212,12 @@
   "modelVersion": 5,
   "modelVersionParserMinimum": 5,
   "retiredEntityUids": [],
-  "retiredIndexUids": [],
-  "retiredPropertyUids": [],
+  "retiredIndexUids": [
+    2758830007158379056
+  ],
+  "retiredPropertyUids": [
+    8920345630354971422
+  ],
   "retiredRelationUids": [],
   "version": 1
 }

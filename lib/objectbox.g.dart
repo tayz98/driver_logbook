@@ -168,13 +168,6 @@ final _entities = <obx_int.ModelEntity>[
             type: 6,
             flags: 0),
         obx_int.ModelProperty(
-            id: const obx_int.IdUid(7, 8920345630354971422),
-            name: 'telemetryId',
-            type: 11,
-            flags: 520,
-            indexId: const obx_int.IdUid(6, 2758830007158379056),
-            relationTarget: 'Telemetry'),
-        obx_int.ModelProperty(
             id: const obx_int.IdUid(8, 350530437595885314),
             name: 'tripCategory',
             type: 9,
@@ -268,8 +261,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
       lastRelationId: const obx_int.IdUid(1, 8053518692451467066),
       lastSequenceId: const obx_int.IdUid(0, 0),
       retiredEntityUids: const [],
-      retiredIndexUids: const [],
-      retiredPropertyUids: const [],
+      retiredIndexUids: const [2758830007158379056],
+      retiredPropertyUids: const [8920345630354971422],
       retiredRelationUids: const [],
       modelVersion: 5,
       modelVersionParserMinimum: 5,
@@ -403,12 +396,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
         }),
     Trip: obx_int.EntityDefinition<Trip>(
         model: _entities[4],
-        toOneRelations: (Trip object) => [
-              object.tripInformation,
-              object.startLocation,
-              object.endLocation,
-              object.telemetry
-            ],
+        toOneRelations: (Trip object) =>
+            [object.tripInformation, object.startLocation, object.endLocation],
         toManyRelations: (Trip object) => {},
         getId: (Trip object) => object.id,
         setId: (Trip object, int id) {
@@ -424,7 +413,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fbb.addInt64(3, object.endLocation.targetId);
           fbb.addInt64(4, object.startMileage);
           fbb.addInt64(5, object.endMileage);
-          fbb.addInt64(6, object.telemetry.targetId);
           fbb.addOffset(7, tripCategoryOffset);
           fbb.addOffset(8, tripStatusOffset);
           fbb.finish(fbb.endTable());
@@ -436,9 +424,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final startLocationParam = obx.ToOne<Location>(
               targetId:
                   const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0));
-          final telemetryParam = obx.ToOne<Telemetry>(
-              targetId:
-                  const fb.Int64Reader().vTableGet(buffer, rootOffset, 16, 0));
           final tripStatusParam = const fb.StringReader(asciiOptimization: true)
               .vTableGet(buffer, rootOffset, 20, '');
           final startMileageParam =
@@ -448,7 +433,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
                   .vTableGet(buffer, rootOffset, 18, '');
           final object = Trip(
               startLocation: startLocationParam,
-              telemetry: telemetryParam,
               tripStatus: tripStatusParam,
               startMileage: startMileageParam,
               tripCategory: tripCategoryParam)
@@ -462,7 +446,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           object.endLocation.targetId =
               const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0);
           object.endLocation.attach(store);
-          object.telemetry.attach(store);
           return object;
         }),
     TripInformation: obx_int.EntityDefinition<TripInformation>(
@@ -608,17 +591,13 @@ class Trip_ {
   static final endMileage =
       obx.QueryIntegerProperty<Trip>(_entities[4].properties[5]);
 
-  /// See [Trip.telemetry].
-  static final telemetry =
-      obx.QueryRelationToOne<Trip, Telemetry>(_entities[4].properties[6]);
-
   /// See [Trip.tripCategory].
   static final tripCategory =
-      obx.QueryStringProperty<Trip>(_entities[4].properties[7]);
+      obx.QueryStringProperty<Trip>(_entities[4].properties[6]);
 
   /// See [Trip.tripStatus].
   static final tripStatus =
-      obx.QueryStringProperty<Trip>(_entities[4].properties[8]);
+      obx.QueryStringProperty<Trip>(_entities[4].properties[7]);
 }
 
 /// [TripInformation] entity fields to define ObjectBox queries.

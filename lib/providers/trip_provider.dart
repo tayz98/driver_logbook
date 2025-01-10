@@ -40,7 +40,6 @@ class TripNotifier extends StateNotifier<Trip?> {
 
     final newTrip = Trip(
       startLocation: ToOne<Location>(),
-      telemetry: ToOne<Telemetry>(),
       tripStatus: "inProgress",
       startMileage: _elm327Service?.vehicleMileage ?? 0,
       tripCategory: "business",
@@ -52,27 +51,27 @@ class TripNotifier extends StateNotifier<Trip?> {
 
     _telemetrySubscription =
         _elm327Service!.vehicleStream.listen((diagnostics) {
-      updateVehicleData(diagnostics);
+      // updateVehicleData(diagnostics);
     });
   }
 
-  void updateVehicleData(VehicleDiagnostics data) {
-    if (state == null) {
-      throw Exception("No trip is currently active.");
-    }
+  // void updateVehicleData(VehicleDiagnostics data) {
+  //   if (state == null) {
+  //     throw Exception("No trip is currently active.");
+  //   }
 
-    state!.telemetry.target?.updateVehicleDiagnostics(data);
-    _tripRepository.saveTrip(state!);
-  }
+  //   state!.vehicleDiagnostics = data;
+  //   _tripRepository.saveTrip(state!);
+  // }
 
-  void updateGpsData(Gps data) {
-    if (state == null) {
-      throw Exception("No trip is currently active.");
-    }
+  // void updateGpsData(Gps data) {
+  //   if (state == null) {
+  //     throw Exception("No trip is currently active.");
+  //   }
 
-    state!.telemetry.target?.updateGps(data);
-    _tripRepository.saveTrip(state!);
-  }
+  //   state!.telemetry.target?.updateGps(data);
+  //   _tripRepository.saveTrip(state!);
+  // }
 
   void endTrip() {
     if (state == null) {

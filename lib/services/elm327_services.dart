@@ -23,7 +23,6 @@ class Elm327Service {
 
 // variables
   bool isIgnitionTurnedOn = false;
-  bool dataIsValid = false;
   String? vehicleVin;
   int? vehicleMileage;
   Timer? checkIgnitionByRequestingMileage;
@@ -55,8 +54,9 @@ class Elm327Service {
     for (String cmd in initCommands) {
       await _sendCommand(cmd);
       await Future.delayed(const Duration(
-          milliseconds: 2500)); // wait for every command to finish
+          milliseconds: 2500)); // wait for every command to process
     }
+    // after initialization, check if the obd-system (ignition) is turned on by sending the mileage command continuously
     mileageSendCommandTimer =
         Timer.periodic(const Duration(seconds: 3), (timer) async {
       await _sendCommand(skodaMileageCommand);
@@ -67,12 +67,10 @@ class Elm327Service {
   void _startTelemetryCollection() {
     _mileageResponseController.stream.listen((_) async {
       if (await _checkData()) {
-        _logStreamController.add("Data is valid. Trip monitoring started.");
         _updateDiagnostics();
-        // Cancel existing timer if any
-        _noResponseTimer?.cancel();
 
-        // Start a new noResponseTimer
+        // use a timer to check if the obd-system (ignition) is turned off
+        _noResponseTimer?.cancel();
         _noResponseTimer = Timer(const Duration(seconds: 10), () {
           _endTelemetryCollection();
         });
@@ -94,9 +92,10 @@ class Elm327Service {
 
   // check if VIN and mileage are valid
   Future<bool> _checkData() async {
-    bool vin =
-        await _checkVin(); // mileage already known, that's why it's not awaited
-    return dataIsValid = vin && _checkMileageOfSkoda();
+    bool vin = await _checkVin();
+    bool mileage =
+        _checkMileageOfSkoda(); // mileage already known by now, that's why it's not awaited
+    return vin && mileage;
   }
 
   // manage incoming data from elm327
@@ -167,7 +166,7 @@ class Elm327Service {
       _logStreamController.add("VIN is invalid");
     }
 
-    if (vehicleVin != null && vehicleVin!.length == 17) {
+    if (vehicleVin?.length == 17) {
       final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
       if (vinRegex.hasMatch(vehicleVin!)) {
         _logStreamController.add("VIN is valid");
