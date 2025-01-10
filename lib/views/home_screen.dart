@@ -157,6 +157,36 @@ class _HomeState extends ConsumerState<Home> {
           ],
         ),
         const SizedBox(height: 8),
+        // Start Location
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.place, color: Colors.blue),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                trip.startLocation.target != null
+                    ? 'Start Location: ${trip.startLocation.target!.street}, ${trip.startLocation.target!.city}, ${trip.startLocation.target!.postalCode}'
+                    : 'Start Location: Not Set',
+                style: const TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        if (trip.endLocation.target != null)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.place, color: Colors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'End Location: ${trip.endLocation.target!.street}, ${trip.endLocation.target!.city}, ${trip.endLocation.target!.postalCode}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
 
         // Start Timestamp
         Row(

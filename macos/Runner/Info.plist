@@ -28,9 +28,15 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>UIBackgroundModes</key>
+	<array>
+    <string>location</string>
+	</array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app uses Bluetooth to connect to the ELM327 device.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location is used to enhance Bluetooth connectivity.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+    <string>Your location is required for accurate notifactions benefits for you, also you cane disable it with no problem </string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Your location is required for accurate notifaction benefits for you  lso you cane disable it with no problem </string>
 </dict>
 </plist>

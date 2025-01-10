@@ -1,8 +1,7 @@
-import 'package:elogbook/models/trip_category.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:objectbox/objectbox.dart';
 import '../models/trip.dart';
-import '../models/location.dart';
+import '../models/trip_location.dart';
 import '../models/trip_status.dart';
 
 // TODO: combine with objectBox store
@@ -12,25 +11,28 @@ class TripNotifier extends StateNotifier<Trip> {
           Trip(
             startMileage: 0,
             vin: '',
-            startLocation: ToOne<Location>(),
+            startLocation: ToOne<TripLocation>()
+              ..target = TripLocation(
+                city: '',
+                postalCode: '',
+                street: '',
+              ),
+            endLocation: ToOne<TripLocation>()..target = null,
             endMileage: null,
             endTimestamp: null,
           ),
         );
 
   void initializeTrip({
-    // TODO: get real location and add it here
     required int startMileage,
     required String vin,
+    required TripLocation startLocation,
   }) {
     state = Trip(
       startMileage: startMileage,
       vin: vin,
-      startLocation: ToOne<Location>()
-        ..target = Location(
-            city: 'Muenchen',
-            postalCode: '10115',
-            street: 'Friedrichstraße 123'),
+      startLocation: ToOne<TripLocation>()..target = startLocation,
+      endLocation: ToOne<TripLocation>()..target = null,
       endMileage: null,
       endTimestamp: null,
       status: TripStatus.inProgress.toString(),
@@ -41,13 +43,20 @@ class TripNotifier extends StateNotifier<Trip> {
     state = state.copyWith(currentMileage: mileage);
   }
 
+  void setEndLocation(TripLocation location) {
+    state = state.copyWith(
+      endLocation: ToOne<TripLocation>()..target = location,
+    );
+  }
+
   void endTrip() {
-    // get end location here
+    if (!isTripInProgress) {
+      throw Exception('Trip is not in progress');
+    }
     state = state.copyWith(
       endMileage: state.currentMileage,
-      endLocation: ToOne<Location>()
-        ..target = Location(
-            city: 'Berlin', postalCode: '10115', street: 'Friedrichstraße 123'),
+      endTimestamp: DateTime.now().toIso8601String(),
+      endLocation: state.endLocation,
       tripStatus: TripStatus.finished.toString(),
     );
   }
@@ -55,12 +64,11 @@ class TripNotifier extends StateNotifier<Trip> {
   void cancelTrip() {
     state = state.copyWith(
       endMileage: state.startMileage,
-      endLocation: state.startLocation,
       tripStatus: TripStatus.cancelled.toString(),
     );
   }
 
-  Trip get trip => state;
-
   bool get isTripInProgress => state.tripStatusEnum == TripStatus.inProgress;
+  bool get isTripNotStarted => state.tripStatusEnum == TripStatus.notStarted;
+  Trip get trip => state;
 }

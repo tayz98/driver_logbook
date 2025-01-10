@@ -5,7 +5,6 @@ import "package:elogbook/repositories/driver_repository.dart";
 import "package:elogbook/services/custom_bluetooth_service.dart";
 import "package:riverpod/riverpod.dart";
 import "package:elogbook/repositories/trip_repository.dart";
-import "package:elogbook/repositories/telemetry_repository.dart";
 
 final storeProvider = Provider<Store>((ref) {
   throw UnimplementedError(); // This will be overridden in main()
@@ -19,11 +18,6 @@ final driverRepositoryProvider = Provider<DriverRepository>((ref) {
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
   final store = ref.read(storeProvider);
   return TripRepository(store);
-});
-
-final telemetryRepositoryProvider = Provider<TelemetryRepository>((ref) {
-  final store = ref.read(storeProvider);
-  return TelemetryRepository(store);
 });
 
 final tripProvider = StateNotifierProvider<TripNotifier, Trip>(

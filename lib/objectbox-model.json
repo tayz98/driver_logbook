@@ -34,79 +34,6 @@
       ]
     },
     {
-      "id": "2:522391902727584447",
-      "lastPropertyId": "1:8682506618904700378",
-      "name": "Gps",
-      "properties": [
-        {
-          "id": "1:8682506618904700378",
-          "name": "id",
-          "type": 6,
-          "flags": 1
-        }
-      ],
-      "relations": []
-    },
-    {
-      "id": "3:3917395289137033145",
-      "lastPropertyId": "4:417434690863460070",
-      "name": "Location",
-      "properties": [
-        {
-          "id": "1:5538011044127542787",
-          "name": "id",
-          "type": 6,
-          "flags": 1
-        },
-        {
-          "id": "2:2608101225926435352",
-          "name": "street",
-          "type": 9
-        },
-        {
-          "id": "3:2136026444521046762",
-          "name": "city",
-          "type": 9
-        },
-        {
-          "id": "4:417434690863460070",
-          "name": "postalCode",
-          "type": 9
-        }
-      ],
-      "relations": []
-    },
-    {
-      "id": "4:800457783229245686",
-      "lastPropertyId": "3:8738200652028959083",
-      "name": "Telemetry",
-      "properties": [
-        {
-          "id": "1:2030316889418012582",
-          "name": "id",
-          "type": 6,
-          "flags": 1
-        },
-        {
-          "id": "2:1017530267524238925",
-          "name": "gpsId",
-          "type": 11,
-          "flags": 520,
-          "indexId": "1:4480262058652235586",
-          "relationTarget": "Gps"
-        },
-        {
-          "id": "3:8738200652028959083",
-          "name": "vehicleDiagnosticsId",
-          "type": 11,
-          "flags": 520,
-          "indexId": "2:345255542831474259",
-          "relationTarget": "VehicleDiagnostics"
-        }
-      ],
-      "relations": []
-    },
-    {
       "id": "5:1832358271218994760",
       "lastPropertyId": "9:1063782334860157701",
       "name": "Trip",
@@ -123,7 +50,7 @@
           "type": 11,
           "flags": 520,
           "indexId": "3:1618193787246806027",
-          "relationTarget": "Location"
+          "relationTarget": "TripLocation"
         },
         {
           "id": "3:5385960739147473959",
@@ -131,7 +58,7 @@
           "type": 11,
           "flags": 520,
           "indexId": "4:1724532676930884542",
-          "relationTarget": "Location"
+          "relationTarget": "TripLocation"
         },
         {
           "id": "4:795573068566224104",
@@ -157,57 +84,64 @@
       "relations": []
     },
     {
-      "id": "6:4749663025170053776",
-      "lastPropertyId": "1:1125954922849964380",
-      "name": "TripInformation",
+      "id": "8:7146167246693813417",
+      "lastPropertyId": "4:4760103922227303277",
+      "name": "TripLocation",
       "properties": [
         {
-          "id": "1:1125954922849964380",
-          "name": "id",
-          "type": 6,
-          "flags": 1
-        }
-      ],
-      "relations": []
-    },
-    {
-      "id": "7:2191456460352204353",
-      "lastPropertyId": "3:2927733738437424194",
-      "name": "VehicleDiagnostics",
-      "properties": [
-        {
-          "id": "1:2488691493552574405",
+          "id": "1:6026804955087671822",
           "name": "id",
           "type": 6,
           "flags": 1
         },
         {
-          "id": "2:1637808822089107047",
-          "name": "vin",
-          "type": 9,
-          "flags": 2080,
-          "indexId": "5:7323061810190391864"
+          "id": "2:1559457446283192550",
+          "name": "street",
+          "type": 9
         },
         {
-          "id": "3:2927733738437424194",
-          "name": "currentMileage",
-          "type": 6
+          "id": "3:4400260653195643072",
+          "name": "city",
+          "type": 9
+        },
+        {
+          "id": "4:4760103922227303277",
+          "name": "postalCode",
+          "type": 9
         }
       ],
       "relations": []
     }
   ],
-  "lastEntityId": "7:2191456460352204353",
+  "lastEntityId": "8:7146167246693813417",
   "lastIndexId": "5:7323061810190391864",
   "lastRelationId": "1:7730691983047863070",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
   "modelVersionParserMinimum": 5,
-  "retiredEntityUids": [],
+  "retiredEntityUids": [
+    3917395289137033145,
+    522391902727584447,
+    800457783229245686,
+    2191456460352204353,
+    4749663025170053776
+  ],
   "retiredIndexUids": [],
   "retiredPropertyUids": [
     5169966380460749462,
-    1063782334860157701
+    1063782334860157701,
+    5538011044127542787,
+    2608101225926435352,
+    2136026444521046762,
+    417434690863460070,
+    8682506618904700378,
+    2030316889418012582,
+    1017530267524238925,
+    8738200652028959083,
+    2488691493552574405,
+    1637808822089107047,
+    2927733738437424194,
+    1125954922849964380
   ],
   "retiredRelationUids": [],
   "version": 1

@@ -2,11 +2,10 @@ library telemetry_services;
 
 import 'dart:convert';
 import 'dart:async';
-import 'package:elogbook/models/trip_status.dart';
 import 'package:elogbook/notification_configuration.dart';
 import 'package:elogbook/services/custom_bluetooth_service.dart';
 import 'package:elogbook/utils/vehicle_utils.dart';
-import '../models/vehicle_diagnostics.dart';
+import 'package:elogbook/services/gps_service.dart';
 import '../providers/providers.dart';
 import '../providers/trip_notifier.dart';
 
@@ -19,16 +18,11 @@ class Elm327Service {
       StreamController<void>.broadcast();
   Stream<void> get mileageResponseStream => _mileageResponseController.stream;
 
-  final StreamController<VehicleDiagnostics>
-      _vehicleDiagnosticsStreamController =
-      StreamController<VehicleDiagnostics>.broadcast();
-  Stream<VehicleDiagnostics> get vehicleStream =>
-      _vehicleDiagnosticsStreamController.stream;
-
 // variables
+  late GpsService gpsService;
   String? _vehicleVin;
   int? _vehicleMileage;
-  int? _previousMileage;
+  //int? _previousMileage;
   Timer? mileageSendCommandTimer;
   Timer? _noResponseTimer;
   String _responseBuffer = '';
@@ -45,8 +39,8 @@ class Elm327Service {
   }
 
 // setup elm327 with init commands, check obd-system by sending mileage messages
-
   Future<void> _initialize() async {
+    gpsService = GpsService();
     List<String> initCommands = [
       "ATZ", // Reset ELM327
       "ATE0", // Echo Off
@@ -73,7 +67,8 @@ class Elm327Service {
   void _startTelemetryCollection() {
     _mileageResponseController.stream.listen((_) async {
       if (await _checkData()) {
-        _updateDiagnostics();
+        await _updateDiagnostics();
+        await Future.delayed(const Duration(seconds: 1));
 
         // use a timer to check if the obd-system (ignition) is turned off
         _noResponseTimer?.cancel();
@@ -162,8 +157,8 @@ class Elm327Service {
     if (_vehicleVin == null) {
       _logStreamController.add("Checking VIN: $_vehicleVin");
       for (int i = 0; i < 3; i++) {
-        // if VIN takes too long to receive, send the command again
         await _sendCommand(vinCommand);
+        // if VIN takes too long to receive, send the command again
         await Future.delayed(const Duration(milliseconds: 2000));
         if (_vehicleVin != null) {
           break;
@@ -173,6 +168,7 @@ class Elm327Service {
     }
 
     if (_vehicleVin?.length == 17) {
+      _logStreamController.add("Checking if VIN has 17 characters");
       final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
       if (vinRegex.hasMatch(_vehicleVin!)) {
         _logStreamController.add("VIN is valid");
@@ -197,31 +193,40 @@ class Elm327Service {
 
   void dispose() {
     _logStreamController.close();
-    _vehicleDiagnosticsStreamController.close();
     mileageSendCommandTimer?.cancel();
     _noResponseTimer?.cancel();
   }
 
-  void _updateDiagnostics() {
+  Future<void> _updateDiagnostics() async {
     if (_vehicleMileage == null || _vehicleVin == null) return;
 
     if (tripNotifier.isTripInProgress) {
-      if (_previousMileage != null && _previousMileage == _vehicleMileage) {
-        return; // mileage has not changed, no need to update
-      }
+      _logStreamController.add("Trip in progress.");
+      // if (_previousMileage != null && _previousMileage == _vehicleMileage) {
+      //   return; // mileage has not changed, no need to update
+      // }
       tripNotifier.updateMileage(_vehicleMileage!);
-    } else {
+    } else if (tripNotifier.isTripNotStarted) {
+      _logStreamController.add("Trip not in progress, starting trip");
+      // TODO: maybe check other trip categories
+      final position = await gpsService.currentPosition;
+      final location = await gpsService.getLocationFromPosition(position);
       tripNotifier.initializeTrip(
         startMileage: _vehicleMileage!,
         vin: _vehicleVin!,
+        startLocation: location,
       );
       showBasicNotification(title: "Trip started!", body: "Trip has started");
     }
+    {
+      _logStreamController.add("Trip is not in progress or not started.");
+    }
   }
 
-  _endTelemetryCollection() {
+  Future<void> _endTelemetryCollection() async {
     _logStreamController.add("Trip ended.");
     showBasicNotification(title: "END TRIP", body: "Trip has ended");
+    tripNotifier.setEndLocation(await gpsService.currentPosition);
     tripNotifier.endTrip();
     dispose();
   }
@@ -232,9 +237,7 @@ class Elm327Service {
   }
 
   void _handleResponseToSkodaMileageCommand(String response) {
-    if (_vehicleMileage != null) {
-      _previousMileage = _vehicleMileage;
-    }
+    //_previousMileage = _vehicleMileage;
     _vehicleMileage = VehicleUtils.getVehicleKmOfSkoda(response);
     _mileageResponseController.add(null);
   }

@@ -1,14 +1,14 @@
 import 'package:objectbox/objectbox.dart';
 
 @Entity()
-class Location {
+class TripLocation {
   @Id()
   int id = 0;
   final String street;
   final String city;
   final String postalCode;
 
-  Location({
+  TripLocation({
     required this.street,
     required this.city,
     required this.postalCode,
