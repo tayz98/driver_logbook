@@ -25,7 +25,7 @@ class TripNotifier extends StateNotifier<Trip?> {
       this._tripRepository, this._elm327Service, this._driverRepository)
       : super(null) {
     if (_elm327Service != null) {
-      _startListening();
+      // _startListening();
     }
   }
 
@@ -86,24 +86,24 @@ class TripNotifier extends StateNotifier<Trip?> {
     _telemetrySubscription = null;
   }
 
-  void _startTelemetryStartedListening() {
-    // TODO: fix
-    _telemetryStartedSubscription =
-        _elm327Service!.telemetryStartedStream.listen((_) {
-      _startListening();
-    });
-  }
+  // void _startTelemetryStartedListening() {
+  //   // TODO: fix
+  //   _telemetryStartedSubscription =
+  //       _elm327Service!.telemetryStartedStream.listen((_) {
+  //     _startListening();
+  //   });
+  // }
 
-  void _startListening() {
-    _ignitionSubscription =
-        _elm327Service!.ignitionStream.listen((isIgnitionOn) {
-      if (isIgnitionOn && state == null) {
-        startTrip();
-      } else if (!isIgnitionOn && state != null) {
-        endTrip();
-      }
-    });
-  }
+  // void _startListening() {
+  //   _ignitionSubscription =
+  //       _elm327Service!.ignitionStream.listen((isIgnitionOn) {
+  //     if (isIgnitionOn && state == null) {
+  //       startTrip();
+  //     } else if (!isIgnitionOn && state != null) {
+  //       endTrip();
+  //     }
+  //   });
+  // }
 
   @override
   void dispose() {

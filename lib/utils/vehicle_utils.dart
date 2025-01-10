@@ -13,7 +13,7 @@ class VehicleUtils {
 
   /// Parses the last 4 hex characters of [response] into an integer.
   /// Returns 0 if parsing fails or if the response is too short.
-  static int getVehicleKm(String response) {
+  static int getVehicleKmOfSkoda(String response) {
     // Validate input length
     // Validate input length
     if (response.length < 8) {
