@@ -2,9 +2,13 @@ library telemetry_services;
 
 import 'dart:convert';
 import 'dart:async';
+import 'package:elogbook/models/trip_status.dart';
+import 'package:elogbook/notification_configuration.dart';
 import 'package:elogbook/services/custom_bluetooth_service.dart';
 import 'package:elogbook/utils/vehicle_utils.dart';
 import '../models/vehicle_diagnostics.dart';
+import '../providers/providers.dart';
+import '../providers/trip_notifier.dart';
 
 class Elm327Service {
   // streams
@@ -22,20 +26,22 @@ class Elm327Service {
       _vehicleDiagnosticsStreamController.stream;
 
 // variables
-  bool isIgnitionTurnedOn = false;
-  String? vehicleVin;
-  int? vehicleMileage;
-  Timer? checkIgnitionByRequestingMileage;
+  String? _vehicleVin;
+  int? _vehicleMileage;
+  int? _previousMileage;
   Timer? mileageSendCommandTimer;
   Timer? _noResponseTimer;
   String _responseBuffer = '';
   final CustomBluetoothService customService;
-  VehicleDiagnostics? _currentVehicleDiagnostics;
   final String skodaMileageCommand = "2210E01";
   final String vinCommand = "0902";
 
   Elm327Service(this.customService) {
     _initialize();
+  }
+
+  TripNotifier get tripNotifier {
+    return customService.ref.read(tripProvider.notifier);
   }
 
 // setup elm327 with init commands, check obd-system by sending mileage messages
@@ -153,22 +159,22 @@ class Elm327Service {
 
   // check if VIN is valid
   Future<bool> _checkVin() async {
-    if (vehicleVin == null) {
-      _logStreamController.add("Checking VIN: $vehicleVin");
+    if (_vehicleVin == null) {
+      _logStreamController.add("Checking VIN: $_vehicleVin");
       for (int i = 0; i < 3; i++) {
         // if VIN takes too long to receive, send the command again
         await _sendCommand(vinCommand);
         await Future.delayed(const Duration(milliseconds: 2000));
-        if (vehicleVin != null) {
+        if (_vehicleVin != null) {
           break;
         }
       }
       _logStreamController.add("VIN is invalid");
     }
 
-    if (vehicleVin?.length == 17) {
+    if (_vehicleVin?.length == 17) {
       final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
-      if (vinRegex.hasMatch(vehicleVin!)) {
+      if (vinRegex.hasMatch(_vehicleVin!)) {
         _logStreamController.add("VIN is valid");
         return true;
       }
@@ -178,10 +184,10 @@ class Elm327Service {
 
   // check if mileage is valid
   bool _checkMileageOfSkoda() {
-    _logStreamController.add("Checking Mileage: $vehicleMileage");
-    if (vehicleMileage != null &&
-        vehicleMileage! >= 0 &&
-        vehicleMileage! <= 2000000) {
+    _logStreamController.add("Checking Mileage: $_vehicleMileage");
+    if (_vehicleMileage != null &&
+        _vehicleMileage! >= 0 &&
+        _vehicleMileage! <= 2000000) {
       _logStreamController.add("Mileage is valid");
       return true;
     }
@@ -192,46 +198,44 @@ class Elm327Service {
   void dispose() {
     _logStreamController.close();
     _vehicleDiagnosticsStreamController.close();
-    checkIgnitionByRequestingMileage?.cancel();
     mileageSendCommandTimer?.cancel();
     _noResponseTimer?.cancel();
   }
 
   void _updateDiagnostics() {
-    // Update or initialize the vehicle diagnostics
-    _currentVehicleDiagnostics ??= VehicleDiagnostics(
-      vin: vehicleVin!,
-      currentMileage: vehicleMileage!,
-    );
+    if (_vehicleMileage == null || _vehicleVin == null) return;
 
-    // Update mileage if it has changed
-    if (_currentVehicleDiagnostics!.currentMileage != vehicleMileage) {
-      _currentVehicleDiagnostics = _currentVehicleDiagnostics!.copyWith(
-        currentMileage: vehicleMileage,
+    if (tripNotifier.isTripInProgress) {
+      if (_previousMileage != null && _previousMileage == _vehicleMileage) {
+        return; // mileage has not changed, no need to update
+      }
+      tripNotifier.updateMileage(_vehicleMileage!);
+    } else {
+      tripNotifier.initializeTrip(
+        startMileage: _vehicleMileage!,
+        vin: _vehicleVin!,
       );
+      showBasicNotification(title: "Trip started!", body: "Trip has started");
     }
-
-    _vehicleDiagnosticsStreamController.add(_currentVehicleDiagnostics!);
   }
 
   _endTelemetryCollection() {
-    _logStreamController.add("Trip monitoring ended. Saving trip data.");
-    _saveTripData();
+    _logStreamController.add("Trip ended.");
+    showBasicNotification(title: "END TRIP", body: "Trip has ended");
+    tripNotifier.endTrip();
     dispose();
   }
 
-  void _saveTripData() {
-    _logStreamController
-        .add("Saving trip data: VIN: $vehicleVin Mileage: $vehicleMileage");
-  }
-
   void _handleResponseToVINCommand(String response) {
-    vehicleVin = VehicleUtils.getVehicleVin(response);
-    _logStreamController.add("VIN received: $vehicleVin");
+    _vehicleVin = VehicleUtils.getVehicleVin(response);
+    _logStreamController.add("VIN received: $_vehicleVin");
   }
 
   void _handleResponseToSkodaMileageCommand(String response) {
-    vehicleMileage = VehicleUtils.getVehicleKmOfSkoda(response);
+    if (_vehicleMileage != null) {
+      _previousMileage = _vehicleMileage;
+    }
+    _vehicleMileage = VehicleUtils.getVehicleKmOfSkoda(response);
     _mileageResponseController.add(null);
   }
 }

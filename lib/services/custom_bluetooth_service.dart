@@ -2,15 +2,22 @@ library telmetry_services;
 
 import 'package:elogbook/utils/extra.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:riverpod/riverpod.dart';
 import 'dart:async';
-import 'elm327_services.dart';
+import 'package:elogbook/services/elm327_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CustomBluetoothService {
+  // Dependencies
+  final Ref ref;
+
   // Streams
   final StreamController<String> _logStreamController =
       StreamController<String>.broadcast();
   Stream<String> get logStream => _logStreamController.stream;
+
+  Stream<String> get telemetryLogStream =>
+      elm327Service?.elm327LogStream ?? const Stream.empty();
 
   // Subscriptions
   StreamSubscription<int>? _rssiStreamSubscription;
@@ -42,7 +49,7 @@ class CustomBluetoothService {
   List<String>? knownRemoteIds;
   final int _rssiTresholdForElm327Service = -70;
 
-  CustomBluetoothService() {
+  CustomBluetoothService(this.ref) {
     FlutterBluePlus.setOptions(restoreState: true);
     FlutterBluePlus.setLogLevel(LogLevel.verbose);
     _initialize();
@@ -233,8 +240,8 @@ class CustomBluetoothService {
       elm327Service ??= Elm327Service(this);
       _logStreamController.add("Characteristics ready. Initializing Dongle...");
       await _notifyCharacteristic!.setNotifyValue(true);
-      elm327Service?.elm327LogStream.listen((logMessage) {
-        _logStreamController.add(logMessage);
+      telemetryLogStream.listen((event) {
+        _logStreamController.add(event);
       });
       _notifyCharacteristic!.lastValueStream
           .listen(elm327Service!.handleReceivedData);

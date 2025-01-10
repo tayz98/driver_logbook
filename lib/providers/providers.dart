@@ -1,9 +1,8 @@
 import "package:elogbook/models/trip.dart";
 import "package:elogbook/objectbox.g.dart";
-import "package:elogbook/providers/trip_provider.dart";
+import "package:elogbook/providers/trip_notifier.dart";
 import "package:elogbook/repositories/driver_repository.dart";
 import "package:elogbook/services/custom_bluetooth_service.dart";
-import "package:elogbook/services/elm327_services.dart";
 import "package:riverpod/riverpod.dart";
 import "package:elogbook/repositories/trip_repository.dart";
 import "package:elogbook/repositories/telemetry_repository.dart";
@@ -27,15 +26,9 @@ final telemetryRepositoryProvider = Provider<TelemetryRepository>((ref) {
   return TelemetryRepository(store);
 });
 
-final customBluetoothServiceProvider = Provider<CustomBluetoothService>(
-  (ref) {
-    final service = CustomBluetoothService();
-    ref.onDispose(() {
-      service.dispose(); // Ensure proper cleanup
-    });
-    return service;
-  },
-  name: "customBluetoothServiceProvider",
+final tripProvider = StateNotifierProvider<TripNotifier, Trip>(
+  (ref) => TripNotifier(),
 );
-
-// TODO: tripProvider
+final customBluetoothServiceProvider = Provider<CustomBluetoothService>((ref) {
+  return CustomBluetoothService(ref);
+});

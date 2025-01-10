@@ -1,5 +1,4 @@
 import '../models/trip.dart';
-import '../models/trip_status.dart';
 import '../objectbox.g.dart';
 
 class TripRepository {
@@ -25,13 +24,5 @@ class TripRepository {
   // Delete a trip
   void deleteTrip(int id) {
     _tripBox.remove(id);
-  }
-
-  // Get trips by status
-  List<Trip> getTripsByStatus(TripStatus status) {
-    return _tripBox
-        .query(Trip_.tripStatus.equals(status.index as String))
-        .build()
-        .find();
   }
 }
