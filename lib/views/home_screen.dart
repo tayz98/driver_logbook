@@ -20,15 +20,15 @@ class _HomeState extends ConsumerState<Home> {
   @override
   void initState() {
     super.initState();
-    final bluetoothService = ref.read(customBluetoothServiceProvider);
-    _logSubscription = bluetoothService.logStream.listen((log) {
-      setState(() {
-        _logs.add(log);
-        if (_logs.length > 15) {
-          _logs.removeAt(0);
-        }
-      });
-    });
+    //final bluetoothService = ref.read(customBluetoothServiceProvider);
+    // _logSubscription = bluetoothService.logStream.listen((log) {
+    //   setState(() {
+    //     _logs.add(log);
+    //     if (_logs.length > 15) {
+    //       _logs.removeAt(0);
+    //     }
+    //   });
+    // });
   }
 
   @override
