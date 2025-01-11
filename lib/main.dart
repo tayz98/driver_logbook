@@ -10,7 +10,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:elogbook/providers/providers.dart';
-import 'package:path_provider/path_provider.dart'; // Aggregate all providers
+import 'package:path_provider/path_provider.dart';
 
 final StreamController<NotificationResponse> selectNotificationStream =
     StreamController<NotificationResponse>.broadcast();

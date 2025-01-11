@@ -32,6 +32,10 @@
 	<array>
     <string>location</string>
 	</array>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>This app uses notifications to alert you about important updates and events.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app uses Bluetooth to communicate with devices and ensure a seamless experience.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app uses Bluetooth to connect to the ELM327 device.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
