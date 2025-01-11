@@ -15,32 +15,36 @@ class Trip {
 
   final int startMileage;
   final int? endMileage;
-  final int currentMileage;
+  final int? currentMileage;
   final String vin;
   final String startTimestamp;
   final String tripCategory;
   final String? endTimestamp;
   final String tripStatus;
 
-  Trip({
-    required this.startLocation,
-    required this.endLocation,
-    required this.startMileage,
-    required this.vin,
-    required this.startTimestamp,
-    this.endTimestamp,
-    this.endMileage,
-    String? status,
-    String? category,
-  })  : tripCategory = category ?? TripCategory.business.toString(),
-        currentMileage = startMileage,
-        tripStatus = status ?? TripStatus.notStarted.toString();
+  Trip(
+      {required this.startLocation,
+      required this.endLocation,
+      required this.startMileage,
+      required this.vin,
+      required this.startTimestamp,
+      required this.endTimestamp,
+      required this.endMileage,
+      required this.currentMileage,
+      required this.tripStatus,
+      required this.tripCategory});
 
-  TripCategory get tripCategoryEnum =>
-      TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
+  TripCategory get tripCategoryEnum {
+    return TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
+  }
 
   TripStatus get tripStatusEnum =>
       TripStatus.values.firstWhere((e) => e.toString() == tripStatus);
+
+  @override
+  String toString() {
+    return 'Trip{id: $id, startMileage: $startMileage, currentMileage: $currentMileage, endMileage: $endMileage, vin: $vin, startTimestamp: $startTimestamp, endTimestamp: $endTimestamp, tripCategory: $tripCategory, tripStatus: $tripStatus, startLocation: $startLocation, endLocation: $endLocation}';
+  }
 
   Trip copyWith({
     int? startMileage,
@@ -56,10 +60,12 @@ class Trip {
   }) {
     return Trip(
       startMileage: startMileage ?? this.startMileage,
+      currentMileage: currentMileage ?? this.currentMileage,
       endMileage: endMileage ?? this.endMileage,
       vin: vin ?? this.vin,
       startTimestamp: startTimestamp ?? this.startTimestamp,
-      category: tripCategory ?? this.tripCategory,
+      tripCategory: tripCategory ?? this.tripCategory,
+      tripStatus: tripStatus ?? this.tripStatus,
       startLocation: startLocation ?? this.startLocation,
       endLocation: endLocation ?? this.endLocation,
       endTimestamp: endTimestamp ?? this.endTimestamp,

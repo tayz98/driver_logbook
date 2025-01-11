@@ -29,7 +29,7 @@ class ScanDevicesButtonState extends State<ScanDevicesButton> {
           });
         }
       },
-      child: const Text("Scan and add new Devices!"),
+      child: const Text("Scan and Save Devices"),
     );
   }
 }

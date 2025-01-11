@@ -11,6 +11,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:elogbook/providers/providers.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 
 final StreamController<NotificationResponse> selectNotificationStream =
     StreamController<NotificationResponse>.broadcast();
@@ -22,6 +23,7 @@ const String portName = 'notification_send_port';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  Intl.defaultLocale = 'de_DE';
   await LogService.initializeLogFile();
   await initializeNotifications();
 

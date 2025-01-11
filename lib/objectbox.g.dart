@@ -53,7 +53,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
       id: const obx_int.IdUid(5, 1832358271218994760),
       name: 'Trip',
-      lastPropertyId: const obx_int.IdUid(10, 1104393838953814765),
+      lastPropertyId: const obx_int.IdUid(13, 6020576199144619562),
       flags: 0,
       properties: <obx_int.ModelProperty>[
         obx_int.ModelProperty(
@@ -98,6 +98,21 @@ final _entities = <obx_int.ModelEntity>[
         obx_int.ModelProperty(
             id: const obx_int.IdUid(10, 1104393838953814765),
             name: 'startTimestamp',
+            type: 9,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(11, 7702087421946930035),
+            name: 'currentMileage',
+            type: 6,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(12, 3868884046055870958),
+            name: 'tripCategory',
+            type: 9,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(13, 6020576199144619562),
+            name: 'tripStatus',
             type: 9,
             flags: 0)
       ],
@@ -249,7 +264,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
               ? null
               : fbb.writeString(object.endTimestamp!);
           final startTimestampOffset = fbb.writeString(object.startTimestamp);
-          fbb.startTable(11);
+          final tripCategoryOffset = fbb.writeString(object.tripCategory);
+          final tripStatusOffset = fbb.writeString(object.tripStatus);
+          fbb.startTable(14);
           fbb.addInt64(0, object.id);
           fbb.addInt64(1, object.startLocation.targetId);
           fbb.addInt64(2, object.endLocation.targetId);
@@ -258,6 +275,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fbb.addOffset(5, vinOffset);
           fbb.addOffset(6, endTimestampOffset);
           fbb.addOffset(9, startTimestampOffset);
+          fbb.addInt64(10, object.currentMileage);
+          fbb.addOffset(11, tripCategoryOffset);
+          fbb.addOffset(12, tripStatusOffset);
           fbb.finish(fbb.endTable());
           return object.id;
         },
@@ -282,6 +302,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
                   .vTableGetNullable(buffer, rootOffset, 16);
           final endMileageParam =
               const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 12);
+          final currentMileageParam =
+              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 24);
+          final tripStatusParam = const fb.StringReader(asciiOptimization: true)
+              .vTableGet(buffer, rootOffset, 28, '');
+          final tripCategoryParam =
+              const fb.StringReader(asciiOptimization: true)
+                  .vTableGet(buffer, rootOffset, 26, '');
           final object = Trip(
               startLocation: startLocationParam,
               endLocation: endLocationParam,
@@ -289,7 +316,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
               vin: vinParam,
               startTimestamp: startTimestampParam,
               endTimestamp: endTimestampParam,
-              endMileage: endMileageParam)
+              endMileage: endMileageParam,
+              currentMileage: currentMileageParam,
+              tripStatus: tripStatusParam,
+              tripCategory: tripCategoryParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
           object.startLocation.attach(store);
           object.endLocation.attach(store);
@@ -385,6 +415,18 @@ class Trip_ {
   /// See [Trip.startTimestamp].
   static final startTimestamp =
       obx.QueryStringProperty<Trip>(_entities[1].properties[7]);
+
+  /// See [Trip.currentMileage].
+  static final currentMileage =
+      obx.QueryIntegerProperty<Trip>(_entities[1].properties[8]);
+
+  /// See [Trip.tripCategory].
+  static final tripCategory =
+      obx.QueryStringProperty<Trip>(_entities[1].properties[9]);
+
+  /// See [Trip.tripStatus].
+  static final tripStatus =
+      obx.QueryStringProperty<Trip>(_entities[1].properties[10]);
 }
 
 /// [TripLocation] entity fields to define ObjectBox queries.

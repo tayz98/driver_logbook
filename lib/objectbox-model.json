@@ -35,7 +35,7 @@
     },
     {
       "id": "5:1832358271218994760",
-      "lastPropertyId": "10:1104393838953814765",
+      "lastPropertyId": "13:6020576199144619562",
       "name": "Trip",
       "properties": [
         {
@@ -83,6 +83,21 @@
         {
           "id": "10:1104393838953814765",
           "name": "startTimestamp",
+          "type": 9
+        },
+        {
+          "id": "11:7702087421946930035",
+          "name": "currentMileage",
+          "type": 6
+        },
+        {
+          "id": "12:3868884046055870958",
+          "name": "tripCategory",
+          "type": 9
+        },
+        {
+          "id": "13:6020576199144619562",
+          "name": "tripStatus",
           "type": 9
         }
       ],

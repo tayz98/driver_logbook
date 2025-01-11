@@ -40,15 +40,15 @@ class _HomeState extends ConsumerState<Home> {
   @override
   Widget build(BuildContext context) {
     final bluetoothService = ref.watch(customBluetoothServiceProvider);
-    final tripNotifier = ref.watch(tripProvider.notifier);
+    final trip = ref.watch(tripProvider);
 
     return Scaffold(
         appBar: AppBar(
-          title: const Text("NovaCorp - Driver's Logbook"),
+          title: const Text("NovaCorp - Fahrtenbuch"),
         ),
         body: Column(
           children: [
-            buildTripDetails(context, tripNotifier.trip),
+            buildTripDetails(context, trip),
             Expanded(
               child: _logs.isNotEmpty
                   ? ListView.builder(

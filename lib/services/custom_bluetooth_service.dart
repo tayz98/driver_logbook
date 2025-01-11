@@ -96,7 +96,7 @@ class CustomBluetoothService {
   void dispose() {
     _logStreamController.close();
     _connectionStateSubscription?.cancel();
-    elm327Service?.dispose();
+    //elm327Service?.dispose();
     _rssiStreamSubscription?.cancel();
     _lastConnectedDevice?.disconnect();
     _devices = [];

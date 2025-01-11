@@ -1,3 +1,5 @@
+import 'package:elogbook/models/trip_category.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:objectbox/objectbox.dart';
 import '../models/trip.dart';
@@ -6,7 +8,8 @@ import '../models/trip_status.dart';
 
 // TODO: combine with objectBox store
 class TripNotifier extends StateNotifier<Trip> {
-  TripNotifier()
+  final Ref ref; //  required for communicating with other providers
+  TripNotifier(this.ref)
       : super(
           Trip(
             startMileage: 0,
@@ -19,8 +22,11 @@ class TripNotifier extends StateNotifier<Trip> {
               ),
             endLocation: ToOne<TripLocation>()..target = null,
             endMileage: null,
+            currentMileage: 0,
             startTimestamp: "",
             endTimestamp: null,
+            tripStatus: TripStatus.notStarted.toString(),
+            tripCategory: TripCategory.business.toString(),
           ),
         );
 
@@ -31,18 +37,20 @@ class TripNotifier extends StateNotifier<Trip> {
   }) {
     state = Trip(
       startMileage: startMileage,
+      currentMileage: startMileage,
       vin: vin,
       startLocation: ToOne<TripLocation>()..target = startLocation,
       endLocation: ToOne<TripLocation>()..target = null,
       endMileage: null,
       startTimestamp: DateTime.now().toIso8601String(),
       endTimestamp: null,
-      status: TripStatus.inProgress.toString(),
+      tripStatus: TripStatus.inProgress.toString(),
+      tripCategory: TripCategory.business.toString(),
     );
   }
 
   void updateMileage(int mileage) {
-    if (mileage <= state.currentMileage) {
+    if (mileage <= state.currentMileage!) {
       return; // avoid setting same mileage
     }
     state = state.copyWith(currentMileage: mileage);
@@ -55,9 +63,6 @@ class TripNotifier extends StateNotifier<Trip> {
   }
 
   void endTrip() {
-    if (state.tripStatus != TripStatus.inProgress.toString()) {
-      throw Exception('Trip is not in progress');
-    }
     state = state.copyWith(
       endMileage: state.currentMileage,
       endTimestamp: DateTime.now().toIso8601String(),
@@ -71,6 +76,4 @@ class TripNotifier extends StateNotifier<Trip> {
       tripStatus: TripStatus.cancelled.toString(),
     );
   }
-
-  Trip get trip => state;
 }

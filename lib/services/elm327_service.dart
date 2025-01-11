@@ -2,6 +2,7 @@ library telemetry_services;
 
 import 'dart:convert';
 import 'dart:async';
+import 'package:elogbook/models/trip.dart';
 import 'package:elogbook/models/trip_status.dart';
 import 'package:elogbook/notification_configuration.dart';
 import 'package:elogbook/services/custom_bluetooth_service.dart';
@@ -38,6 +39,10 @@ class Elm327Service {
     return customService.ref.read(tripProvider.notifier);
   }
 
+  Trip get trip {
+    return customService.ref.read(tripProvider);
+  }
+
 // setup elm327 with init commands, check obd-system by sending mileage messages
   Future<void> _initialize() async {
     gpsService = GpsService();
@@ -68,17 +73,21 @@ class Elm327Service {
     _mileageResponseController.stream.listen((_) async {
       if (await _checkData()) {
         _noResponseTimer?.cancel();
-
-        await _updateDiagnostics();
+        _logStreamController.add("Starting no response timer");
         // use a timer to check if the obd-system (ignition) is turned off
-        _noResponseTimer = Timer(const Duration(seconds: 10), () {
-          _endTelemetryCollection();
+        _noResponseTimer = Timer(const Duration(seconds: 12), () async {
+          _logStreamController
+              .add("12 seconds no response, stopping telemetry");
+          await _endTelemetryCollection();
         });
+        if (trip.tripStatus != TripStatus.finished.toString()) {
+          await _updateDiagnostics();
+        }
       } else {
         showBasicNotification(
             title: "Invalid Data",
             body: "Trip cannot record because of invalid data");
-        dispose();
+        //dispose();
       }
     });
   }
@@ -200,7 +209,7 @@ class Elm327Service {
 
   Future<void> _updateDiagnostics() async {
     if (_vehicleMileage == null || _vehicleVin == null) return;
-    if (tripNotifier.trip.tripStatus == TripStatus.notStarted.toString()) {
+    if (trip.tripStatus == TripStatus.notStarted.toString()) {
       _logStreamController.add("Starting trip");
       final position = await gpsService.currentPosition;
       final location = await gpsService.getLocationFromPosition(position);
@@ -211,22 +220,27 @@ class Elm327Service {
 
       showBasicNotification(
           title: "Trip has started!", body: "Trip is recording data");
-    } else if (tripNotifier.trip.tripStatus ==
-        TripStatus.inProgress.toString()) {
+    } else if (trip.tripStatus == TripStatus.inProgress.toString()) {
       tripNotifier.updateMileage(_vehicleMileage!);
       _logStreamController.add("updated mileage");
+    } else if (trip.tripStatus == TripStatus.finished.toString()) {
+      _logStreamController.add("Trip has already ended");
     } else {
       _logStreamController.add("Something went wrong!");
     }
   }
 
-  // TODO: trip wird nicht beendet
+  // TODO: trip status does not change to ended
   Future<void> _endTelemetryCollection() async {
     showBasicNotification(title: "END TRIP", body: "Trip has ended");
     final endPosition = await gpsService.currentPosition;
     final endLocation = await gpsService.getLocationFromPosition(endPosition);
     tripNotifier.setEndLocation(endLocation);
     tripNotifier.endTrip();
+    mileageSendCommandTimer?.cancel();
+    mileageSendCommandTimer = null;
+    //_mileageResponseController.close();
+
     //dispose();
     // TODO: überlegen, ob dispose() hier aufgerufen werden soll oder erst wenn die BT-Verbindung getrennt wird
   }

@@ -15,6 +15,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   geocoding: ^3.0.0
   geolocator: ^13.0.2
+  intl: ^0.20.1
   objectbox: ^4.0.3
   objectbox_flutter_libs: ^4.0.3
   objectbox_generator: ^4.0.3

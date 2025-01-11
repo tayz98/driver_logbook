@@ -20,9 +20,10 @@ final tripRepositoryProvider = Provider<TripRepository>((ref) {
   return TripRepository(store);
 });
 
-final tripProvider = StateNotifierProvider<TripNotifier, Trip>(
-  (ref) => TripNotifier(),
-);
+final tripProvider = StateNotifierProvider<TripNotifier, Trip>((ref) {
+  return TripNotifier(ref);
+});
+
 final customBluetoothServiceProvider = Provider<CustomBluetoothService>((ref) {
   return CustomBluetoothService(ref);
 });
