@@ -73,11 +73,8 @@ class Elm327Service {
     _mileageResponseController.stream.listen((_) async {
       if (await _checkData()) {
         _noResponseTimer?.cancel();
-        _logStreamController.add("Starting no response timer");
         // use a timer to check if the obd-system (ignition) is turned off
         _noResponseTimer = Timer(const Duration(seconds: 12), () async {
-          _logStreamController
-              .add("12 seconds no response, stopping telemetry");
           await _endTelemetryCollection();
         });
         if (trip.tripStatus != TripStatus.finished.toString()) {
@@ -98,7 +95,6 @@ class Elm327Service {
     List<int> bytes = utf8.encode(fullCommand);
     await customService.writeCharacteristic!
         .write(bytes, withoutResponse: true);
-    _logStreamController.add("Sent command: $command");
   }
 
   // check if VIN and mileage are valid
@@ -146,7 +142,6 @@ class Elm327Service {
         .replaceAll("OK", "");
 
     if (cleanedResponse.isEmpty) return; // unsolicited response, ignore it
-    _logStreamController.add("Received: $cleanedResponse");
     // every mileage response starts with 6210
     if (cleanedResponse.contains("6210")) {
       // startsWith doesn't work for some reason, that's why contains is used
@@ -165,7 +160,6 @@ class Elm327Service {
   // check if VIN is valid
   Future<bool> _checkVin() async {
     if (_vehicleVin == null) {
-      _logStreamController.add("Checking VIN: $_vehicleVin");
       for (int i = 0; i < 3; i++) {
         await _sendCommand(vinCommand);
         // if VIN takes too long to receive, send the command again
@@ -174,14 +168,11 @@ class Elm327Service {
           break;
         }
       }
-      _logStreamController.add("VIN is invalid");
     }
 
     if (_vehicleVin?.length == 17) {
-      _logStreamController.add("Checking if VIN has 17 characters");
       final RegExp vinRegex = RegExp(r'^[A-HJ-NPR-Z0-9]+$');
       if (vinRegex.hasMatch(_vehicleVin!)) {
-        _logStreamController.add("VIN is valid");
         return true;
       }
     }
@@ -190,14 +181,11 @@ class Elm327Service {
 
   // check if mileage is valid
   bool _checkMileageOfSkoda() {
-    _logStreamController.add("Checking Mileage: $_vehicleMileage");
     if (_vehicleMileage != null &&
         _vehicleMileage! >= 0 &&
         _vehicleMileage! <= 2000000) {
-      _logStreamController.add("Mileage is valid");
       return true;
     }
-    _logStreamController.add("Mileage is invalid");
     return false;
   }
 
@@ -210,7 +198,6 @@ class Elm327Service {
   Future<void> _updateDiagnostics() async {
     if (_vehicleMileage == null || _vehicleVin == null) return;
     if (trip.tripStatus == TripStatus.notStarted.toString()) {
-      _logStreamController.add("Starting trip");
       final position = await gpsService.currentPosition;
       final location = await gpsService.getLocationFromPosition(position);
       tripNotifier.initializeTrip(
@@ -222,15 +209,10 @@ class Elm327Service {
           title: "Trip has started!", body: "Trip is recording data");
     } else if (trip.tripStatus == TripStatus.inProgress.toString()) {
       tripNotifier.updateMileage(_vehicleMileage!);
-      _logStreamController.add("updated mileage");
     } else if (trip.tripStatus == TripStatus.finished.toString()) {
-      _logStreamController.add("Trip has already ended");
-    } else {
-      _logStreamController.add("Something went wrong!");
-    }
+    } else {}
   }
 
-  // TODO: trip status does not change to ended
   Future<void> _endTelemetryCollection() async {
     showBasicNotification(title: "END TRIP", body: "Trip has ended");
     final endPosition = await gpsService.currentPosition;
@@ -239,10 +221,9 @@ class Elm327Service {
     tripNotifier.endTrip();
     mileageSendCommandTimer?.cancel();
     mileageSendCommandTimer = null;
+    // TODO: überlegen wegen dispose
     //_mileageResponseController.close();
-
     //dispose();
-    // TODO: überlegen, ob dispose() hier aufgerufen werden soll oder erst wenn die BT-Verbindung getrennt wird
   }
 
   void _handleResponseToVINCommand(String response) {
