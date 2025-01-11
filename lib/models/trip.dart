@@ -27,12 +27,12 @@ class Trip {
     required this.endLocation,
     required this.startMileage,
     required this.vin,
+    required this.startTimestamp,
     this.endTimestamp,
     this.endMileage,
     String? status,
     String? category,
   })  : tripCategory = category ?? TripCategory.business.toString(),
-        startTimestamp = DateTime.now().toIso8601String(),
         currentMileage = startMileage,
         tripStatus = status ?? TripStatus.notStarted.toString();
 
@@ -58,6 +58,7 @@ class Trip {
       startMileage: startMileage ?? this.startMileage,
       endMileage: endMileage ?? this.endMileage,
       vin: vin ?? this.vin,
+      startTimestamp: startTimestamp ?? this.startTimestamp,
       category: tripCategory ?? this.tripCategory,
       startLocation: startLocation ?? this.startLocation,
       endLocation: endLocation ?? this.endLocation,

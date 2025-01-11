@@ -2,6 +2,7 @@ library telemetry_services;
 
 import 'dart:convert';
 import 'dart:async';
+import 'package:elogbook/models/trip_status.dart';
 import 'package:elogbook/notification_configuration.dart';
 import 'package:elogbook/services/custom_bluetooth_service.dart';
 import 'package:elogbook/utils/vehicle_utils.dart';
@@ -22,7 +23,6 @@ class Elm327Service {
   late GpsService gpsService;
   String? _vehicleVin;
   int? _vehicleMileage;
-  //int? _previousMileage;
   Timer? mileageSendCommandTimer;
   Timer? _noResponseTimer;
   String _responseBuffer = '';
@@ -67,16 +67,17 @@ class Elm327Service {
   void _startTelemetryCollection() {
     _mileageResponseController.stream.listen((_) async {
       if (await _checkData()) {
-        await _updateDiagnostics();
-        await Future.delayed(const Duration(seconds: 1));
-
-        // use a timer to check if the obd-system (ignition) is turned off
         _noResponseTimer?.cancel();
+
+        await _updateDiagnostics();
+        // use a timer to check if the obd-system (ignition) is turned off
         _noResponseTimer = Timer(const Duration(seconds: 10), () {
           _endTelemetryCollection();
         });
       } else {
-        _logStreamController.add("Data is invalid. Trip cannot be recorded.");
+        showBasicNotification(
+            title: "Invalid Data",
+            body: "Trip cannot record because of invalid data");
         dispose();
       }
     });
@@ -199,36 +200,35 @@ class Elm327Service {
 
   Future<void> _updateDiagnostics() async {
     if (_vehicleMileage == null || _vehicleVin == null) return;
-
-    if (tripNotifier.isTripInProgress) {
-      _logStreamController.add("Trip in progress.");
-      // if (_previousMileage != null && _previousMileage == _vehicleMileage) {
-      //   return; // mileage has not changed, no need to update
-      // }
-      tripNotifier.updateMileage(_vehicleMileage!);
-    } else if (tripNotifier.isTripNotStarted) {
-      _logStreamController.add("Trip not in progress, starting trip");
-      // TODO: maybe check other trip categories
+    if (tripNotifier.trip.tripStatus == TripStatus.notStarted.toString()) {
+      _logStreamController.add("Starting trip");
       final position = await gpsService.currentPosition;
       final location = await gpsService.getLocationFromPosition(position);
       tripNotifier.initializeTrip(
-        startMileage: _vehicleMileage!,
-        vin: _vehicleVin!,
-        startLocation: location,
-      );
-      showBasicNotification(title: "Trip started!", body: "Trip has started");
-    }
-    {
-      _logStreamController.add("Trip is not in progress or not started.");
+          startMileage: _vehicleMileage!,
+          vin: _vehicleVin!,
+          startLocation: location);
+
+      showBasicNotification(
+          title: "Trip has started!", body: "Trip is recording data");
+    } else if (tripNotifier.trip.tripStatus ==
+        TripStatus.inProgress.toString()) {
+      tripNotifier.updateMileage(_vehicleMileage!);
+      _logStreamController.add("updated mileage");
+    } else {
+      _logStreamController.add("Something went wrong!");
     }
   }
 
+  // TODO: trip wird nicht beendet
   Future<void> _endTelemetryCollection() async {
-    _logStreamController.add("Trip ended.");
     showBasicNotification(title: "END TRIP", body: "Trip has ended");
-    tripNotifier.setEndLocation(await gpsService.currentPosition);
+    final endPosition = await gpsService.currentPosition;
+    final endLocation = await gpsService.getLocationFromPosition(endPosition);
+    tripNotifier.setEndLocation(endLocation);
     tripNotifier.endTrip();
-    dispose();
+    //dispose();
+    // TODO: überlegen, ob dispose() hier aufgerufen werden soll oder erst wenn die BT-Verbindung getrennt wird
   }
 
   void _handleResponseToVINCommand(String response) {
@@ -237,7 +237,6 @@ class Elm327Service {
   }
 
   void _handleResponseToSkodaMileageCommand(String response) {
-    //_previousMileage = _vehicleMileage;
     _vehicleMileage = VehicleUtils.getVehicleKmOfSkoda(response);
     _mileageResponseController.add(null);
   }

@@ -19,6 +19,7 @@ class TripNotifier extends StateNotifier<Trip> {
               ),
             endLocation: ToOne<TripLocation>()..target = null,
             endMileage: null,
+            startTimestamp: "",
             endTimestamp: null,
           ),
         );
@@ -34,12 +35,16 @@ class TripNotifier extends StateNotifier<Trip> {
       startLocation: ToOne<TripLocation>()..target = startLocation,
       endLocation: ToOne<TripLocation>()..target = null,
       endMileage: null,
+      startTimestamp: DateTime.now().toIso8601String(),
       endTimestamp: null,
       status: TripStatus.inProgress.toString(),
     );
   }
 
   void updateMileage(int mileage) {
+    if (mileage <= state.currentMileage) {
+      return; // avoid setting same mileage
+    }
     state = state.copyWith(currentMileage: mileage);
   }
 
@@ -50,13 +55,12 @@ class TripNotifier extends StateNotifier<Trip> {
   }
 
   void endTrip() {
-    if (!isTripInProgress) {
+    if (state.tripStatus != TripStatus.inProgress.toString()) {
       throw Exception('Trip is not in progress');
     }
     state = state.copyWith(
       endMileage: state.currentMileage,
       endTimestamp: DateTime.now().toIso8601String(),
-      endLocation: state.endLocation,
       tripStatus: TripStatus.finished.toString(),
     );
   }
@@ -68,7 +72,5 @@ class TripNotifier extends StateNotifier<Trip> {
     );
   }
 
-  bool get isTripInProgress => state.tripStatusEnum == TripStatus.inProgress;
-  bool get isTripNotStarted => state.tripStatusEnum == TripStatus.notStarted;
   Trip get trip => state;
 }

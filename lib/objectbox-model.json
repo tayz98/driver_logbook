@@ -35,7 +35,7 @@
     },
     {
       "id": "5:1832358271218994760",
-      "lastPropertyId": "9:1063782334860157701",
+      "lastPropertyId": "10:1104393838953814765",
       "name": "Trip",
       "properties": [
         {
@@ -78,6 +78,11 @@
         {
           "id": "7:5943347980171961364",
           "name": "endTimestamp",
+          "type": 9
+        },
+        {
+          "id": "10:1104393838953814765",
+          "name": "startTimestamp",
           "type": 9
         }
       ],

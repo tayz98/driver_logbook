@@ -35,6 +35,7 @@ class _HomeState extends ConsumerState<Home> {
     super.dispose();
   }
 
+// TODO: Button hinzufuegen, um alle Permissions zu erfragen.
   @override
   Widget build(BuildContext context) {
     final bluetoothService = ref.watch(customBluetoothServiceProvider);
