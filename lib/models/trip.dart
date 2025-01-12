@@ -47,7 +47,24 @@ class Trip {
 
   @override
   String toString() {
-    return 'Trip{id: $id, startMileage: $startMileage, currentMileage: $currentMileage, endMileage: $endMileage, vin: $vin, startTimestamp: $startTimestamp, endTimestamp: $endTimestamp, tripCategory: $tripCategory, tripStatus: $tripStatus, startLocation: $startLocation, endLocation: $endLocation}';
+    return '''
+Trip {
+  id: $id,
+  tripId: $tripId,
+  driverId: ${driver.target?.uid},
+  driverName: ${driver.target?.surname},
+  startMileage: $startMileage,
+  currentMileage: $currentMileage,
+  endMileage: $endMileage,
+  vin: $vin,
+  startTimestamp: $startTimestamp,
+  endTimestamp: $endTimestamp,
+  tripCategory: $tripCategory,
+  tripStatus: $tripStatus,
+  startLocation: ${startLocation.target},
+  endLocation: ${endLocation.target}
+}
+''';
   }
 
   Trip copyWith({

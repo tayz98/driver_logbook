@@ -50,6 +50,9 @@ class _HomeState extends ConsumerState<Home> {
     final bluetoothService = ref.watch(customBluetoothServiceProvider);
     final trip = ref.watch(tripProvider);
     final driver = ref.watch(driverProvider);
+    // print objectbox data:
+    debugPrint(driver?.trips.toString());
+    //debugPrint(driver.toString());
 
     return Scaffold(
         appBar: AppBar(

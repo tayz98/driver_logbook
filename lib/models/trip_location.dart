@@ -13,4 +13,9 @@ class TripLocation {
     required this.city,
     required this.postalCode,
   });
+
+  @override
+  String toString() {
+    return 'TripLocation{street: $street, city: $city, postalCode: $postalCode}';
+  }
 }
