@@ -1,13 +1,14 @@
+import 'package:elogbook/models/driver.dart';
 import 'package:elogbook/models/trip_category.dart';
 import 'package:elogbook/models/trip.dart';
 import 'package:elogbook/models/trip_status.dart';
 import 'package:elogbook/models/trip_location.dart';
+import 'package:elogbook/providers/providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:objectbox/objectbox.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// TODO: combine with objectBox store
 class TripNotifier extends StateNotifier<Trip> {
   final Ref ref; //  required for communicating with other providers
   TripNotifier(this.ref)
@@ -28,34 +29,25 @@ class TripNotifier extends StateNotifier<Trip> {
             endTimestamp: null,
             tripStatus: TripStatus.notStarted.toString(),
             tripCategory: TripCategory.business.toString(),
+            driver: ToOne<Driver>()..target = null,
           ),
         );
 
-  void initializeTrip({
-    required int startMileage,
-    required String vin,
-    required TripLocation startLocation,
-  }) {
+  void initializeTrip(
+      {required int startMileage,
+      required String vin,
+      required TripLocation startLocation,
+      required Driver driver}) {
+    state.startLocation.target = startLocation;
+    state.driver.target = driver;
     state = state.copyWith(
       startMileage: startMileage,
       currentMileage: startMileage,
       vin: vin,
-      startLocation: ToOne<TripLocation>()..target = startLocation,
       startTimestamp: DateTime.now().toIso8601String(),
       tripStatus: TripStatus.inProgress.toString(),
     );
-    // state = Trip(
-    //   startMileage: startMileage,
-    //   currentMileage: startMileage,
-    //   vin: vin,
-    //   startLocation: ToOne<TripLocation>()..target = startLocation,
-    //   endLocation: ToOne<TripLocation>()..target = null,
-    //   endMileage: null,
-    //   startTimestamp: DateTime.now().toIso8601String(),
-    //   endTimestamp: null,
-    //   tripStatus: TripStatus.inProgress.toString(),
-    //   tripCategory: TripCategory.business.toString(),
-    // );
+    ref.read(tripRepositoryProvider).saveTrip(state);
   }
 
   void changeMode(TripCategory mode) async {
@@ -81,9 +73,7 @@ class TripNotifier extends StateNotifier<Trip> {
   }
 
   void setEndLocation(TripLocation location) {
-    state = state.copyWith(
-      endLocation: ToOne<TripLocation>()..target = location,
-    );
+    state.endLocation.target = location;
   }
 
   void endTrip() {
@@ -92,6 +82,11 @@ class TripNotifier extends StateNotifier<Trip> {
       endTimestamp: DateTime.now().toIso8601String(),
       tripStatus: TripStatus.finished.toString(),
     );
+    ref.read(tripRepositoryProvider).saveTrip(state);
+  }
+
+  List<Trip> getTrips() {
+    return ref.read(tripRepositoryProvider).getAllTrips();
   }
 
   void cancelTrip() {

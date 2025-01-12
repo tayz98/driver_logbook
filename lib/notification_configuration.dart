@@ -46,6 +46,35 @@ Future<void> initializeNotifications() async {
   );
 }
 
+Future<bool> checkNotificationPermission() async {
+  if (Platform.isAndroid) {
+    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    var returnAndroid =
+        await androidImplementation?.areNotificationsEnabled() ?? true;
+
+    // Assume granted if Android API < 33
+    return returnAndroid;
+  }
+
+  if (Platform.isIOS) {
+    final bool? iosGranted = await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+    return iosGranted ?? false;
+  }
+
+  // Default to true for other platforms
+  return true;
+}
+
 /// Request notification permissions for both Android and iOS
 Future<void> requestNotificationPermission() async {
   // Request permission on Android 13+

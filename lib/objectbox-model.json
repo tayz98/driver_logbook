@@ -5,37 +5,43 @@
   "entities": [
     {
       "id": "1:6912504348649240809",
-      "lastPropertyId": "3:8297823567899394019",
+      "lastPropertyId": "7:9032816223888766268",
       "name": "Driver",
       "properties": [
         {
           "id": "1:5375092990666349265",
           "name": "id",
           "type": 6,
-          "flags": 129
+          "flags": 1
         },
         {
-          "id": "2:5605056955698089737",
-          "name": "isAuthorized",
+          "id": "4:8462103263919081522",
+          "name": "isAllowedToDoPrivateTrips",
           "type": 1
         },
         {
-          "id": "3:8297823567899394019",
-          "name": "privateTrips",
-          "type": 1
+          "id": "5:2900811730491421924",
+          "name": "name",
+          "type": 9
+        },
+        {
+          "id": "6:2819295180917484206",
+          "name": "surname",
+          "type": 9
+        },
+        {
+          "id": "7:9032816223888766268",
+          "name": "uid",
+          "type": 9,
+          "flags": 2080,
+          "indexId": "6:8081175554485677451"
         }
       ],
-      "relations": [
-        {
-          "id": "1:7730691983047863070",
-          "name": "trips",
-          "targetId": "5:1832358271218994760"
-        }
-      ]
+      "relations": []
     },
     {
       "id": "5:1832358271218994760",
-      "lastPropertyId": "13:6020576199144619562",
+      "lastPropertyId": "14:1659708753855515667",
       "name": "Trip",
       "properties": [
         {
@@ -99,6 +105,14 @@
           "id": "13:6020576199144619562",
           "name": "tripStatus",
           "type": 9
+        },
+        {
+          "id": "14:1659708753855515667",
+          "name": "driverId",
+          "type": 11,
+          "flags": 520,
+          "indexId": "7:9100210303411249520",
+          "relationTarget": "Driver"
         }
       ],
       "relations": []
@@ -134,7 +148,7 @@
     }
   ],
   "lastEntityId": "8:7146167246693813417",
-  "lastIndexId": "5:7323061810190391864",
+  "lastIndexId": "7:9100210303411249520",
   "lastRelationId": "1:7730691983047863070",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
@@ -161,8 +175,12 @@
     2488691493552574405,
     1637808822089107047,
     2927733738437424194,
-    1125954922849964380
+    1125954922849964380,
+    5605056955698089737,
+    8297823567899394019
   ],
-  "retiredRelationUids": [],
+  "retiredRelationUids": [
+    7730691983047863070
+  ],
   "version": 1
 }

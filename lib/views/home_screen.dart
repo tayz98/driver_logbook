@@ -22,6 +22,12 @@ class _HomeState extends ConsumerState<Home> {
   void initState() {
     super.initState();
     ref.read(tripProvider.notifier).restoreCategory();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (ref.read(driverProvider) == null) {
+        _showUserInputDialog(context);
+      }
+    });
+
     //final bluetoothService = ref.read(customBluetoothServiceProvider);
     // _logSubscription = bluetoothService.logStream.listen((log) {
     //   setState(() {
@@ -43,6 +49,7 @@ class _HomeState extends ConsumerState<Home> {
   Widget build(BuildContext context) {
     final bluetoothService = ref.watch(customBluetoothServiceProvider);
     final trip = ref.watch(tripProvider);
+    final driver = ref.watch(driverProvider);
 
     return Scaffold(
         appBar: AppBar(
@@ -50,7 +57,7 @@ class _HomeState extends ConsumerState<Home> {
         ),
         body: Column(
           children: [
-            buildTripDetails(context, trip),
+            if (driver != null) buildTripDetails(context, trip, driver),
             const Spacer(),
             Expanded(
               child: Column(
@@ -94,5 +101,82 @@ class _HomeState extends ConsumerState<Home> {
             ],
           ),
         ));
+  }
+
+  void _showUserInputDialog(BuildContext context) {
+    String firstName = '';
+    String lastName = '';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Registrierung'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: const InputDecoration(labelText: 'Vorname'),
+                onChanged: (value) {
+                  firstName = value;
+                },
+              ),
+              TextField(
+                decoration: const InputDecoration(labelText: 'Nachname'),
+                onChanged: (value) {
+                  lastName = value;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                side: BorderSide(
+                  color: Theme.of(context).dividerColor,
+                  width: 1.5,
+                ),
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+              ).copyWith(
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                  (states) {
+                    if (states.contains(WidgetState.pressed)) {
+                      return Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.1);
+                    }
+                    return Theme.of(context).colorScheme.surface;
+                  },
+                ),
+              ),
+              onPressed: () {
+                if (firstName.isNotEmpty && lastName.isNotEmpty) {
+                  ref.read(driverProvider.notifier).initializeDriver(
+                        firstName,
+                        lastName,
+                      );
+                  if (Navigator.canPop(context)) {
+                    Navigator.of(context).pop();
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please fill in all fields.')),
+                  );
+                }
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

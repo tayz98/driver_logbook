@@ -1,9 +1,9 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
-
+import 'package:elogbook/models/driver.dart';
 import 'package:objectbox/objectbox.dart';
 import 'trip_location.dart';
 import './trip_category.dart';
 import './trip_status.dart';
+import 'package:uuid/uuid.dart';
 
 @Entity()
 class Trip {
@@ -12,6 +12,7 @@ class Trip {
 
   final ToOne<TripLocation> startLocation;
   final ToOne<TripLocation> endLocation;
+  final ToOne<Driver> driver;
 
   final int startMileage;
   final int? endMileage;
@@ -21,18 +22,21 @@ class Trip {
   final String tripCategory;
   final String? endTimestamp;
   final String tripStatus;
+  final String tripId;
 
   Trip(
       {required this.startLocation,
       required this.endLocation,
       required this.startMileage,
+      required this.driver,
       required this.vin,
       required this.startTimestamp,
       required this.endTimestamp,
       required this.endMileage,
       required this.currentMileage,
       required this.tripStatus,
-      required this.tripCategory});
+      required this.tripCategory})
+      : tripId = const Uuid().v4();
 
   TripCategory get tripCategoryEnum {
     return TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
@@ -55,8 +59,9 @@ class Trip {
     String? endTimestamp,
     String? tripCategory,
     String? tripStatus,
-    ToOne<TripLocation>? startLocation,
-    ToOne<TripLocation>? endLocation,
+    // ToOne<TripLocation>? startLocation,
+    // ToOne<TripLocation>? endLocation,
+    // ToOne<Driver>? driver,
   }) {
     return Trip(
       startMileage: startMileage ?? this.startMileage,
@@ -66,9 +71,10 @@ class Trip {
       startTimestamp: startTimestamp ?? this.startTimestamp,
       tripCategory: tripCategory ?? this.tripCategory,
       tripStatus: tripStatus ?? this.tripStatus,
-      startLocation: startLocation ?? this.startLocation,
-      endLocation: endLocation ?? this.endLocation,
+      startLocation: startLocation,
+      endLocation: endLocation,
       endTimestamp: endTimestamp ?? this.endTimestamp,
+      driver: driver,
     );
   }
 }

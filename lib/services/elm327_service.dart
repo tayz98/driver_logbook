@@ -2,6 +2,7 @@ library telemetry_services;
 
 import 'dart:convert';
 import 'dart:async';
+import 'package:elogbook/models/driver.dart';
 import 'package:elogbook/models/trip.dart';
 import 'package:elogbook/models/trip_status.dart';
 import 'package:elogbook/notification_configuration.dart';
@@ -43,8 +44,13 @@ class Elm327Service {
     return customService.ref.read(tripProvider);
   }
 
+  Driver? get driver {
+    return customService.ref.read(driverProvider);
+  }
+
 // setup elm327 with init commands, check obd-system by sending mileage messages
   Future<void> _initialize() async {
+    if (driver == null) return;
     gpsService = GpsService();
     List<String> initCommands = [
       "ATZ", // Reset ELM327
@@ -203,7 +209,8 @@ class Elm327Service {
       tripNotifier.initializeTrip(
           startMileage: _vehicleMileage!,
           vin: _vehicleVin!,
-          startLocation: location);
+          startLocation: location,
+          driver: driver!);
 
       showBasicNotification(
           title: "Trip has started!", body: "Trip is recording data");
@@ -221,9 +228,6 @@ class Elm327Service {
     tripNotifier.endTrip();
     mileageSendCommandTimer?.cancel();
     mileageSendCommandTimer = null;
-    // TODO: überlegen wegen dispose
-    //_mileageResponseController.close();
-    //dispose();
   }
 
   void _handleResponseToVINCommand(String response) {

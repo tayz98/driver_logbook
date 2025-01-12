@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:elogbook/notification_configuration.dart';
 
 class PermissionsButton extends StatefulWidget {
   const PermissionsButton({super.key});
@@ -86,6 +89,15 @@ class PermissionsButtonState extends State<PermissionsButton> {
       }
     }
 
+    await requestNotificationPermission();
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      final bool notificationGranted = await checkNotificationPermission();
+      if (!notificationGranted) {
+        allGranted = false;
+      }
+    }
+
     setState(() {
       _isRequesting = false;
     });
@@ -100,6 +112,7 @@ class PermissionsButtonState extends State<PermissionsButton> {
   void _showPermissionsGrantedDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
           title: const Text('Berechtigungen wurden gewährt'),
@@ -108,7 +121,9 @@ class PermissionsButtonState extends State<PermissionsButton> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => {
+                if (Navigator.canPop(context)) {Navigator.of(context).pop()}
+              },
               child: const Text('OK'),
             ),
           ],
@@ -120,6 +135,7 @@ class PermissionsButtonState extends State<PermissionsButton> {
   void _showPermissionsDeniedDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
         return AlertDialog(
           title: const Text('Berechtigungen wurden verweigert'),
@@ -128,7 +144,9 @@ class PermissionsButtonState extends State<PermissionsButton> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => {
+                if (Navigator.canPop(context)) {Navigator.of(context).pop()}
+              },
               child: const Text('OK'),
             ),
           ],

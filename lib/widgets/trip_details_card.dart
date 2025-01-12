@@ -2,8 +2,9 @@ import 'package:elogbook/models/trip.dart';
 import 'package:elogbook/models/trip_status.dart';
 import 'package:flutter/material.dart';
 import 'package:elogbook/utils/help.dart';
+import 'package:elogbook/models/driver.dart';
 
-Widget buildTripDetails(BuildContext context, Trip trip) {
+Widget buildTripDetails(BuildContext context, Trip trip, Driver driver) {
   return Card(
     elevation: 4,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -13,17 +14,23 @@ Widget buildTripDetails(BuildContext context, Trip trip) {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Trip Status
-          Row(
-            children: [
-              const Icon(Icons.directions_car, color: Colors.blue),
-              const SizedBox(width: 8),
-              Text(
-                Helper.formatCategory(trip.tripCategory),
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
+          Row(children: [
+            const Icon(Icons.directions_car, color: Colors.blue),
+            const SizedBox(width: 8),
+            Text(
+              Helper.formatCategory(trip.tripCategory),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ]),
+          Row(children: [
+            const Icon(Icons.person, color: Colors.black),
+            const SizedBox(width: 8),
+            Text(
+              driver.surname,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ]),
+
           const Divider(),
           trip.tripStatus != TripStatus.notStarted.toString()
               ? Column(

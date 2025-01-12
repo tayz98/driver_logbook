@@ -12,6 +12,7 @@ class StreamControllerReemit<T> {
 
   Stream<T> get stream {
     return _latestValue != null
+        // ignore: null_check_on_nullable_type_parameter
         ? _controller.stream.newStreamWithInitialValue(_latestValue!)
         : _controller.stream;
   }

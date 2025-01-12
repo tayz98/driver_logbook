@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      objectbox_generator:
+        enabled: true
+        generate_for:
+          - lib/models/**.dart
+      source_gen|combining_builder:
+        enabled: false # Disable combining_builder explicitly

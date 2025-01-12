@@ -2,22 +2,28 @@ import 'package:elogbook/models/trip_category.dart';
 import 'package:intl/intl.dart';
 
 class Helper {
-  // TODO: CHECK IF IT IS WORKING
-  static String formatDateString(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return 'Ungültiges Datum';
+  static Future<String> formatDateString(String? raw) async {
+    if (raw == null || raw.trim().isEmpty) {
+      return 'Ungültiges Datum';
+    }
+
     DateTime? parsed = _normalizeAndParseDateTime(raw);
     if (parsed == null) {
       return 'Ungültiges Datum';
     }
+
     return DateFormat('dd.MM.yyyy HH:mm').format(parsed);
   }
 
   static DateTime? _normalizeAndParseDateTime(String raw) {
     String input = raw.trim();
+
+    // Adjust for fractional seconds if necessary
     final dotIndex = input.indexOf('.');
     if (dotIndex != -1) {
       final fractionPart =
           input.substring(dotIndex + 1).split(RegExp(r'[^0-9]')).first;
+
       if (fractionPart.length > 6) {
         final truncatedFraction = fractionPart.substring(0, 6);
         input = input.replaceFirst(
@@ -26,7 +32,14 @@ class Helper {
         );
       }
     }
-    return DateTime.tryParse(input);
+
+    try {
+      return DateTime.parse(input);
+    } catch (e) {
+      // Fallback to more lenient parsing
+      print('DateTime.parse failed for input: $input');
+      return null;
+    }
   }
 
   static String tripCategoryToDisplay(TripCategory category) {
