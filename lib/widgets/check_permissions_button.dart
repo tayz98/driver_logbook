@@ -24,12 +24,50 @@ class PermissionsButtonState extends State<PermissionsButton> {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: _isRequesting ? null : _requestAllPermissions,
-      child: _isRequesting
-          ? const CircularProgressIndicator(color: Colors.blueAccent)
-          : const Text('Request Permissions'),
-    );
+    return OutlinedButton(
+        onPressed: _isRequesting ? null : _requestAllPermissions,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          side: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1.5,
+          ),
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+        ).copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+            (states) {
+              if (states.contains(WidgetState.pressed)) {
+                return Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.1);
+              }
+              return Theme.of(context).colorScheme.surface;
+            },
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith<Color?>(
+            (states) {
+              if (states.contains(WidgetState.pressed)) {
+                return Theme.of(context).colorScheme.primary;
+              }
+              return Theme.of(context).colorScheme.onSurface;
+            },
+          ),
+        ),
+        child: _isRequesting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Text('Berechtigungen anfordern und speichern'));
   }
 
   Future<void> _requestAllPermissions() async {
@@ -37,14 +75,65 @@ class PermissionsButtonState extends State<PermissionsButton> {
       _isRequesting = true;
     });
 
+    bool allGranted = true;
+
     for (var permission in _permissions) {
       if (!await permission.isGranted) {
-        await permission.request();
+        final status = await permission.request();
+        if (status != PermissionStatus.granted) {
+          allGranted = false;
+        }
       }
     }
 
     setState(() {
       _isRequesting = false;
     });
+
+    if (allGranted) {
+      _showPermissionsGrantedDialog();
+    } else {
+      _showPermissionsDeniedDialog();
+    }
+  }
+
+  void _showPermissionsGrantedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Berechtigungen wurden gewährt'),
+          content: const Text(
+            'Alle Berechtigungen wurden gewährt. Sie können jetzt fortfahren.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPermissionsDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Berechtigungen wurden verweigert'),
+          content: const Text(
+            'Einige Berechtigungen wurden verweigert. Bitte gewähren Sie alle Berechtigungen, um fortzufahren.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

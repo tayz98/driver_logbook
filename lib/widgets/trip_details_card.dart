@@ -18,14 +18,13 @@ Widget buildTripDetails(BuildContext context, Trip trip) {
               const Icon(Icons.directions_car, color: Colors.blue),
               const SizedBox(width: 8),
               Text(
-                Helper.formatDateString(trip.startTimestamp),
+                Helper.formatCategory(trip.tripCategory),
                 style:
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
           const Divider(),
-          // Conditionally display widgets based on trip.tripStatus
           trip.tripStatus != TripStatus.notStarted.toString()
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +57,7 @@ Widget buildTripDetails(BuildContext context, Trip trip) {
                     if (trip.endMileage != null)
                       Row(
                         children: [
-                          const Icon(Icons.speed, color: Colors.green),
+                          const Icon(Icons.speed, color: Colors.red),
                           const SizedBox(width: 8),
                           Text(
                             'Endkilometerstand: ${trip.endMileage}km',
@@ -103,7 +102,7 @@ Widget buildTripDetails(BuildContext context, Trip trip) {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.place, color: Colors.green),
+                          const Icon(Icons.place, color: Colors.blue),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -132,7 +131,7 @@ Widget buildTripDetails(BuildContext context, Trip trip) {
                     if (trip.endTimestamp != null)
                       Row(
                         children: [
-                          const Icon(Icons.access_time, color: Colors.teal),
+                          const Icon(Icons.access_time, color: Colors.brown),
                           const SizedBox(width: 8),
                           Text(
                             'Endzeitpunkt: ${Helper.formatDateString(trip.endTimestamp!)}',

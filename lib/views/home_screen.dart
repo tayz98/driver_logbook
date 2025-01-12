@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'package:elogbook/widgets/check_permissions_button.dart';
+import 'package:elogbook/widgets/choose_trip_mode_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import 'package:elogbook/widgets/trip_details_card.dart';
 import 'package:elogbook/widgets/scan_devices_button.dart';
-import 'package:elogbook/widgets/check_permissions_button.dart';
 
 class Home extends ConsumerStatefulWidget {
   const Home({super.key});
@@ -20,6 +21,7 @@ class _HomeState extends ConsumerState<Home> {
   @override
   void initState() {
     super.initState();
+    ref.read(tripProvider.notifier).restoreCategory();
     //final bluetoothService = ref.read(customBluetoothServiceProvider);
     // _logSubscription = bluetoothService.logStream.listen((log) {
     //   setState(() {
@@ -49,6 +51,20 @@ class _HomeState extends ConsumerState<Home> {
         body: Column(
           children: [
             buildTripDetails(context, trip),
+            const Spacer(),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ChooseTripModeButtons(
+                    initialMode: trip.tripCategoryEnum,
+                    onModeChanged: (newMode) {
+                      ref.read(tripProvider.notifier).changeMode(newMode);
+                    },
+                  ),
+                ],
+              ),
+            ),
             Expanded(
               child: _logs.isNotEmpty
                   ? ListView.builder(
@@ -59,17 +75,24 @@ class _HomeState extends ConsumerState<Home> {
                         );
                       },
                     )
-                  : const Center(child: Text("No logs yet.")),
+                  : Container(),
+              //const Center(child: Text("No logs yet.")),
             ),
           ],
         ),
         bottomNavigationBar: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ScanDevicesButton(onPressed: bluetoothService.scanForDevices),
-                  const PermissionsButton()
-                ])));
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ScanDevicesButton(
+                onScan: () => bluetoothService.scanForDevices(),
+              ),
+              const SizedBox(height: 8),
+              const PermissionsButton(),
+            ],
+          ),
+        ));
   }
 }

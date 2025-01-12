@@ -78,7 +78,10 @@ class CustomBluetoothService {
 
         // needed because when disconnect() is used on autoConnect
         // the device is not auto connecting anymore
-        _lastConnectedDevice?.connectAndUpdateStream();
+        Future.delayed(const Duration(seconds: 15), () {
+          // longer delay to prevent reconnecting to the same device if other devices are available
+          _lastConnectedDevice?.connectAndUpdateStream();
+        });
       }
     });
 
@@ -98,6 +101,7 @@ class CustomBluetoothService {
   }
 
   Future<void> _disposeConnection(BluetoothDevice dev) async {
+    elm327Service = null;
     _lastConnectedDevice = dev;
     _connectedDevice = null;
     _writeCharacteristic = null;
@@ -143,7 +147,7 @@ class CustomBluetoothService {
     try {
       for (var id in knownRemoteIds!) {
         if (_devices.any((device) => device.remoteId.str == id)) {
-          continue; // Skip to the next device ID
+          continue;
         }
         try {
           final device = BluetoothDevice.fromId(id);
@@ -179,8 +183,8 @@ class CustomBluetoothService {
           withNames: [_targetAdvName],
           timeout: const Duration(seconds: 4));
       await Future.delayed(const Duration(milliseconds: 4100));
-      await _saveDeviceIds(
-          _scanResults.map((r) => r.device.remoteId.str).toList());
+      final deviceIds = _scanResults.map((r) => r.device.remoteId.str).toList();
+      await _saveDeviceIds(deviceIds);
       await _fetchDevicesFromIds();
     } catch (e) {
       return;
