@@ -22,6 +22,8 @@ class Trip {
   final String tripCategory;
   final String? endTimestamp;
   final String tripStatus;
+  @Index()
+  @Unique()
   final String tripId;
 
   Trip(

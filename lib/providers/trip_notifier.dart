@@ -47,7 +47,6 @@ class TripNotifier extends StateNotifier<Trip> {
       startTimestamp: DateTime.now().toIso8601String(),
       tripStatus: TripStatus.inProgress.toString(),
     );
-    ref.read(tripRepositoryProvider).saveTrip(state);
   }
 
   void changeMode(TripCategory mode) async {

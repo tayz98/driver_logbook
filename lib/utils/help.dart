@@ -2,7 +2,7 @@ import 'package:elogbook/models/trip_category.dart';
 import 'package:intl/intl.dart';
 
 class Helper {
-  static Future<String> formatDateString(String? raw) async {
+  static String formatDateString(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
       return 'Ungültiges Datum';
     }
