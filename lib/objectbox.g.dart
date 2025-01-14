@@ -104,11 +104,6 @@ final _entities = <obx_int.ModelEntity>[
             type: 9,
             flags: 0),
         obx_int.ModelProperty(
-            id: const obx_int.IdUid(10, 1104393838953814765),
-            name: 'startTimestamp',
-            type: 9,
-            flags: 0),
-        obx_int.ModelProperty(
             id: const obx_int.IdUid(11, 7702087421946930035),
             name: 'currentMileage',
             type: 6,
@@ -227,7 +222,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
         2927733738437424194,
         1125954922849964380,
         5605056955698089737,
-        8297823567899394019
+        8297823567899394019,
+        1104393838953814765
       ],
       retiredRelationUids: const [7730691983047863070],
       modelVersion: 5,
@@ -267,13 +263,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
               .vTableGet(buffer, rootOffset, 12, '');
           final surnameParam = const fb.StringReader(asciiOptimization: true)
               .vTableGet(buffer, rootOffset, 14, '');
-          final isAllowedToDoPrivateTripsParam =
-              const fb.BoolReader().vTableGet(buffer, rootOffset, 10, false);
-          final object = Driver(
-              name: nameParam,
-              surname: surnameParam,
-              isAllowedToDoPrivateTrips: isAllowedToDoPrivateTripsParam)
+          final object = Driver(name: nameParam, surname: surnameParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
+            ..isAllowedToDoPrivateTrips =
+                const fb.BoolReader().vTableGet(buffer, rootOffset, 10, false)
             ..uid = const fb.StringReader(asciiOptimization: true)
                 .vTableGet(buffer, rootOffset, 16, '');
           obx_int.InternalToManyAccess.setRelInfo<Driver>(
@@ -297,7 +290,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final endTimestampOffset = object.endTimestamp == null
               ? null
               : fbb.writeString(object.endTimestamp!);
-          final startTimestampOffset = fbb.writeString(object.startTimestamp);
           final tripCategoryOffset = fbb.writeString(object.tripCategory);
           final tripStatusOffset = fbb.writeString(object.tripStatus);
           fbb.startTable(15);
@@ -308,7 +300,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fbb.addInt64(4, object.endMileage);
           fbb.addOffset(5, vinOffset);
           fbb.addOffset(6, endTimestampOffset);
-          fbb.addOffset(9, startTimestampOffset);
           fbb.addInt64(10, object.currentMileage);
           fbb.addOffset(11, tripCategoryOffset);
           fbb.addOffset(12, tripStatusOffset);
@@ -319,12 +310,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
         objectFromFB: (obx.Store store, ByteData fbData) {
           final buffer = fb.BufferContext(fbData);
           final rootOffset = buffer.derefObject(0);
-          final startLocationParam = obx.ToOne<TripLocation>(
-              targetId:
-                  const fb.Int64Reader().vTableGet(buffer, rootOffset, 6, 0));
-          final endLocationParam = obx.ToOne<TripLocation>(
-              targetId:
-                  const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0));
           final startMileageParam =
               const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0);
           final driverParam = obx.ToOne<Driver>(
@@ -332,35 +317,32 @@ obx_int.ModelDefinition getObjectBoxModel() {
                   const fb.Int64Reader().vTableGet(buffer, rootOffset, 30, 0));
           final vinParam = const fb.StringReader(asciiOptimization: true)
               .vTableGet(buffer, rootOffset, 14, '');
-          final startTimestampParam =
-              const fb.StringReader(asciiOptimization: true)
-                  .vTableGet(buffer, rootOffset, 22, '');
-          final endTimestampParam =
-              const fb.StringReader(asciiOptimization: true)
-                  .vTableGetNullable(buffer, rootOffset, 16);
-          final endMileageParam =
-              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 12);
-          final currentMileageParam =
-              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 24);
-          final tripStatusParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 28, '');
           final tripCategoryParam =
               const fb.StringReader(asciiOptimization: true)
                   .vTableGet(buffer, rootOffset, 26, '');
+          final tripStatusParam = const fb.StringReader(asciiOptimization: true)
+              .vTableGet(buffer, rootOffset, 28, '');
+          final endMileageParam =
+              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 12);
+          final endTimestampParam =
+              const fb.StringReader(asciiOptimization: true)
+                  .vTableGetNullable(buffer, rootOffset, 16);
           final object = Trip(
-              startLocation: startLocationParam,
-              endLocation: endLocationParam,
               startMileage: startMileageParam,
               driver: driverParam,
               vin: vinParam,
-              startTimestamp: startTimestampParam,
-              endTimestamp: endTimestampParam,
-              endMileage: endMileageParam,
-              currentMileage: currentMileageParam,
+              tripCategory: tripCategoryParam,
               tripStatus: tripStatusParam,
-              tripCategory: tripCategoryParam)
-            ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
+              endMileage: endMileageParam,
+              endTimestamp: endTimestampParam)
+            ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
+            ..currentMileage =
+                const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0);
+          object.startLocation.targetId =
+              const fb.Int64Reader().vTableGet(buffer, rootOffset, 6, 0);
           object.startLocation.attach(store);
+          object.endLocation.targetId =
+              const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0);
           object.endLocation.attach(store);
           object.driver.attach(store);
           return object;
@@ -459,25 +441,21 @@ class Trip_ {
   static final endTimestamp =
       obx.QueryStringProperty<Trip>(_entities[1].properties[6]);
 
-  /// See [Trip.startTimestamp].
-  static final startTimestamp =
-      obx.QueryStringProperty<Trip>(_entities[1].properties[7]);
-
   /// See [Trip.currentMileage].
   static final currentMileage =
-      obx.QueryIntegerProperty<Trip>(_entities[1].properties[8]);
+      obx.QueryIntegerProperty<Trip>(_entities[1].properties[7]);
 
   /// See [Trip.tripCategory].
   static final tripCategory =
-      obx.QueryStringProperty<Trip>(_entities[1].properties[9]);
+      obx.QueryStringProperty<Trip>(_entities[1].properties[8]);
 
   /// See [Trip.tripStatus].
   static final tripStatus =
-      obx.QueryStringProperty<Trip>(_entities[1].properties[10]);
+      obx.QueryStringProperty<Trip>(_entities[1].properties[9]);
 
   /// See [Trip.driver].
   static final driver =
-      obx.QueryRelationToOne<Trip, Driver>(_entities[1].properties[11]);
+      obx.QueryRelationToOne<Trip, Driver>(_entities[1].properties[10]);
 }
 
 /// [TripLocation] entity fields to define ObjectBox queries.

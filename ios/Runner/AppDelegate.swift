@@ -10,6 +10,12 @@ import flutter_local_notifications
   ) -> Bool {
     FlutterLocalNotificationsPlugin.setPluginRegistrantCallback { (registry) in
     GeneratedPluginRegistrant.register(with: registry)
+    // oder:
+    // SwiftFlutterForegroundTaskPlugin.setPluginRegistrantCallback { registry in
+    // 
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
+    }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }

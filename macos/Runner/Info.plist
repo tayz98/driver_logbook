@@ -28,9 +28,15 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+    <string>com.pravera.flutter_foreground_task.refresh</string>
 	<key>UIBackgroundModes</key>
 	<array>
-    <string>location</string>
+    <string>processing</string>
+    <string>bluetooth-central</string>
+	<string>location</string>
+	<string>fetch</string>
 	</array>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>This app uses notifications to alert you about important updates and events.</string>

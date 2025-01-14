@@ -10,33 +10,33 @@ class Trip {
   @Id()
   int id = 0;
 
-  final ToOne<TripLocation> startLocation;
-  final ToOne<TripLocation> endLocation;
+  final ToOne<TripLocation> startLocation = ToOne<TripLocation>();
+  final ToOne<TripLocation> endLocation = ToOne<TripLocation>();
   final ToOne<Driver> driver;
 
   final int startMileage;
-  final int? endMileage;
-  final int? currentMileage;
   final String vin;
   final String startTimestamp;
-  final String tripCategory;
-  final String? endTimestamp;
-  final String tripStatus;
+  @Index()
+  @Unique()
   final String tripId;
+  String? endTimestamp;
+  int? endMileage;
+  int currentMileage;
+  String tripCategory;
+  String tripStatus;
 
-  Trip(
-      {required this.startLocation,
-      required this.endLocation,
-      required this.startMileage,
-      required this.driver,
-      required this.vin,
-      required this.startTimestamp,
-      required this.endTimestamp,
-      required this.endMileage,
-      required this.currentMileage,
-      required this.tripStatus,
-      required this.tripCategory})
-      : tripId = const Uuid().v4();
+  Trip({
+    required this.startMileage,
+    required this.driver,
+    required this.vin,
+    required this.tripCategory,
+    required this.tripStatus,
+    this.endMileage,
+    this.endTimestamp,
+  })  : tripId = const Uuid().v4(),
+        currentMileage = startMileage,
+        startTimestamp = DateTime.now().toIso8601String();
 
   TripCategory get tripCategoryEnum {
     return TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
@@ -65,33 +65,5 @@ Trip {
   endLocation: ${endLocation.target}
 }
 ''';
-  }
-
-  Trip copyWith({
-    int? startMileage,
-    int? currentMileage,
-    int? endMileage,
-    String? vin,
-    String? startTimestamp,
-    String? endTimestamp,
-    String? tripCategory,
-    String? tripStatus,
-    // ToOne<TripLocation>? startLocation,
-    // ToOne<TripLocation>? endLocation,
-    // ToOne<Driver>? driver,
-  }) {
-    return Trip(
-      startMileage: startMileage ?? this.startMileage,
-      currentMileage: currentMileage ?? this.currentMileage,
-      endMileage: endMileage ?? this.endMileage,
-      vin: vin ?? this.vin,
-      startTimestamp: startTimestamp ?? this.startTimestamp,
-      tripCategory: tripCategory ?? this.tripCategory,
-      tripStatus: tripStatus ?? this.tripStatus,
-      startLocation: startLocation,
-      endLocation: endLocation,
-      endTimestamp: endTimestamp ?? this.endTimestamp,
-      driver: driver,
-    );
   }
 }

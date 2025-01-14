@@ -1,7 +1,5 @@
-// elevated button widget
-
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:elogbook/models/globals.dart';
 
 class ScanDevicesButton extends StatefulWidget {
   final Future<void> Function() onScan;
@@ -20,12 +18,10 @@ class ScanDevicesButtonState extends State<ScanDevicesButton> {
         onPressed: () async {
           try {
             await widget.onScan();
-            final prefs = await SharedPreferences.getInstance();
-            final deviceIds = prefs.getStringList('knownRemoteIds') ?? [];
 
-            if (deviceIds.isNotEmpty) {
+            if (foundDeviceIds.isNotEmpty) {
               if (localContext.mounted) {
-                _showScanResultsDialog(localContext, deviceIds);
+                _showScanResultsDialog(localContext, foundDeviceIds);
               }
             } else {
               if (localContext.mounted) _showNoDevicesFoundDialog(localContext);

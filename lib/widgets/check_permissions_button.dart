@@ -5,7 +5,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:elogbook/notification_configuration.dart';
 
 class PermissionsButton extends StatefulWidget {
-  const PermissionsButton({super.key});
+  final bool permissionGranted;
+  final ValueChanged<bool> onPermissionStatusChanged;
+  const PermissionsButton({
+    super.key,
+    required this.permissionGranted,
+    required this.onPermissionStatusChanged,
+  });
 
   @override
   PermissionsButtonState createState() => PermissionsButtonState();
@@ -22,6 +28,8 @@ class PermissionsButtonState extends State<PermissionsButton> {
     Permission.notification,
     Permission.bluetoothScan,
     Permission.bluetoothConnect,
+    Permission.scheduleExactAlarm,
+    Permission.ignoreBatteryOptimizations,
     //Permission.backgroundRefresh, // TODO: check if this is needed
   ];
 
@@ -100,6 +108,7 @@ class PermissionsButtonState extends State<PermissionsButton> {
 
     setState(() {
       _isRequesting = false;
+      widget.onPermissionStatusChanged(allGranted);
     });
 
     if (allGranted) {

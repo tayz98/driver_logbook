@@ -76,13 +76,16 @@ Future<bool> checkNotificationPermission() async {
 }
 
 /// Request notification permissions for both Android and iOS
-Future<void> requestNotificationPermission() async {
+Future<bool> requestNotificationPermission() async {
+  bool permissionGranted = true;
+
   // Request permission on Android 13+
   if (Platform.isAndroid) {
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
         flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
-    await androidImplementation?.requestNotificationsPermission();
+    permissionGranted =
+        await androidImplementation?.requestNotificationsPermission() ?? true;
   }
 
   if (Platform.isIOS) {
@@ -96,7 +99,10 @@ Future<void> requestNotificationPermission() async {
         );
 
     debugPrint('iOS Permission Granted: $result');
+    permissionGranted = result ?? false;
   }
+
+  return permissionGranted;
 }
 
 /// Example function to show a notification. You can add more as needed.
