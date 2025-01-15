@@ -40,7 +40,7 @@ class TripController {
     _currentTrip!.startLocation.target = startLocation;
   }
 
-  void changeMode(TripCategory newCategory) async {
+  void changeCategory(TripCategory newCategory) async {
     if (_currentTrip == null) {
       debugPrint("Trip not found");
       throw Exception('Trip not found');
@@ -58,6 +58,7 @@ class TripController {
       return;
     } else {
       _currentTrip!.currentMileage = mileage;
+      debugPrint("Mileage updated");
     }
   }
 
@@ -81,7 +82,7 @@ class TripController {
     _currentTrip = null;
   }
 
-  // think about conditions for cancelling a trip
+  // a use case could be to cancel a trip if the background task got destroyed.
   void cancelTrip(TripLocation? endLocation) {
     if (_currentTrip == null) {
       debugPrint("Trip not found");

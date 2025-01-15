@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:elogbook/models/driver.dart';
 import 'package:elogbook/models/globals.dart';
 import 'package:elogbook/models/trip_category.dart';
 import 'package:elogbook/notification_configuration.dart';
-import 'package:elogbook/objectbox.g.dart';
+import 'package:elogbook/objectbox.dart';
 import 'package:elogbook/widgets/check_permissions_button.dart';
 import 'package:elogbook/widgets/choose_trip_mode_buttons.dart';
 import 'package:flutter/material.dart';
@@ -26,14 +24,13 @@ class Home extends StatefulWidget {
 
 class HomeState extends State<Home> {
   //final List<String> _logs = [];
-  late final StreamSubscription<String> _logSubscription;
+  //late final StreamSubscription<String> _logSubscription;
   CustomBluetoothService? _customBluetoothService;
   SharedPreferences? _prefs;
   Timer? _reloadTimer;
   int? _newModeIndex;
   bool arePermissionsGranted = false;
   bool _isServiceRunning = false;
-  Store? _store;
   final List<Permission> _permissions = [
     Permission.location,
     Permission.locationAlways,
@@ -47,7 +44,7 @@ class HomeState extends State<Home> {
   ];
 
   @override
-  void initState() {
+  initState() {
     super.initState();
     _customBluetoothService = CustomBluetoothService();
     SharedPreferences.getInstance().then((prefs) {
@@ -56,84 +53,59 @@ class HomeState extends State<Home> {
       });
     });
     FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+    sendAllDataPeriodicallyToTask();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _initForegroundService();
       await _requestAllPermissions();
+      // start the service automatically on startup
       if (await FlutterForegroundTask.isRunningService == false &&
           arePermissionsGranted) {
         await _startBluetoothService();
-        await _askIsolateForStoreReference();
+      }
+      // Check if service is running and set the state accordingly
+      if (await FlutterForegroundTask.isRunningService &&
+          arePermissionsGranted) {
+        setState(() {
+          _isServiceRunning = true;
+        });
+      }
+      // only show user registration dialog if no driver is registered
+      if (ObjectBox.store.box<Driver>().isEmpty()) {
+        if (mounted) {
+          _showUserInputDialog(context);
+        }
       }
     });
   }
 
   @override
   void dispose() {
-    _logSubscription.cancel();
+    //_logSubscription.cancel();
     _reloadTimer?.cancel();
+    _reloadTimer = null;
     FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
     _customBluetoothService = null;
+    ObjectBox.store.close();
     super.dispose();
   }
 
-  Future<void> _askIsolateForStoreReference() async {
-    bool isInitialized = false;
-
-    // Listen for initialization status from the foreground isolate
-    FlutterForegroundTask.addTaskDataCallback((data) {
-      if (data is Map && data['status'] == 'initialized') {
-        isInitialized = true;
-        debugPrint(
-            '[Main] Received initialization status from foreground isolate');
-      }
-    });
-
-    // Wait until initialization signal is received
-    while (!isInitialized) {
-      debugPrint('[Main] Waiting for foreground isolate to initialize...');
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-
-    // Send the command to request the store reference
-    debugPrint('[Main] Sending get_store_reference command');
-    FlutterForegroundTask.sendDataToTask({'command': 'get_store_reference'});
-  }
-
-  void _onReceiveTaskData(Object data) {
-    debugPrint('[Main] Received data from background: $data');
-
-    if (data is Map && data.containsKey('storeRef')) {
-      final List<int> serializedStoreRef = data['storeRef'];
-      final ByteData storeRef =
-          ByteData.sublistView(Uint8List.fromList(serializedStoreRef));
-
-      // Recreate the ObjectBox store using the deserialized reference
-      _store = Store.fromReference(getObjectBoxModel(), storeRef);
-      setState(() {});
-      debugPrint('[Main] Recreated store from received reference');
-
-      if (_store != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showUserInputDialog(context);
-        });
-      }
-    } else {
-      debugPrint('[Main] Received unsupported data: $data');
-    }
-  }
+  void _onReceiveTaskData(Object data) {}
 
   void _initForegroundService() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'foreground_service',
-        channelName: 'Foreground Service Notification',
-        channelDescription:
-            'This notification appears when the foreground service is running.',
-        onlyAlertOnce: true,
-      ),
+          channelId: 'foreground_service',
+          channelName: 'Foreground Service Notification',
+          channelDescription:
+              'Dieser Kanal wird für den Vordergrunddienst verwendet.',
+          onlyAlertOnce: false,
+          playSound: true,
+          showBadge: true,
+          priority: NotificationPriority.MAX,
+          channelImportance: NotificationChannelImportance.MAX),
       iosNotificationOptions: const IOSNotificationOptions(
-        showNotification: false,
-        playSound: false,
+        showNotification: true,
+        playSound: true,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
         eventAction: ForegroundTaskEventAction.repeat(4000),
@@ -168,7 +140,7 @@ class HomeState extends State<Home> {
       }
 
       if (allGranted) {
-        _showPermissionsGrantedDialog();
+        //_showPermissionsGrantedDialog();
       } else {
         _showPermissionsDeniedDialog();
       }
@@ -191,7 +163,7 @@ class HomeState extends State<Home> {
         return AlertDialog(
           title: const Text('Berechtigungen wurden verweigert'),
           content: const Text(
-            'Einige Berechtigungen wurden verweigert. Bitte gewähren Sie alle Berechtigungen, um fortzufahren.',
+            'Einige Berechtigungen wurden verweigert. Die App funktioniert nicht ohne diese.',
           ),
           actions: [
             TextButton(
@@ -206,6 +178,7 @@ class HomeState extends State<Home> {
     );
   }
 
+  // TODO: find a way to implement this usefully
   void _showPermissionsGrantedDialog() {
     showDialog(
       context: context,
@@ -229,20 +202,43 @@ class HomeState extends State<Home> {
     );
   }
 
-  Future<ServiceRequestResult> _startBluetoothService() async {
-    return FlutterForegroundTask.startService(
-      notificationTitle: 'Bluetooth Foreground Service',
-      notificationText: 'Scanning/Connecting to devices...',
-      callback: startCallback,
-    );
+  Future<ServiceRequestResult?> _startBluetoothService() async {
+    if (_isServiceRunning) {
+      debugPrint('Service is already running. Exiting the method.');
+      return null;
+    }
+    setState(() {
+      _isServiceRunning = true;
+    });
+
+    try {
+      final result = await FlutterForegroundTask.startService(
+        notificationTitle: 'Vordergrunddienst läuft',
+        notificationText:
+            'Die Aufzeichnung von Fahrten kann jederzeit gestartet werden!',
+        callback: startCallback,
+      );
+      return result;
+    } catch (e) {
+      debugPrint('Failed to start the Bluetooth service: $e');
+      setState(() {
+        _isServiceRunning = false;
+      });
+      rethrow;
+    }
   }
 
   Future<ServiceRequestResult> _stopBluetoothService() async {
+    setState(() {
+      _isServiceRunning = false;
+    });
     return FlutterForegroundTask.stopService();
   }
 
-  void startTaskAvailabilityListenerToSendData() {
-    _reloadTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+  // TODO: think if this needs to be reworked
+  void sendAllDataPeriodicallyToTask() {
+    // send every 2 seconds device ids and mode index to the service
+    _reloadTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       _isServiceRunning = await FlutterForegroundTask.isRunningService;
 
       if (!arePermissionsGranted) {
@@ -253,7 +249,7 @@ class HomeState extends State<Home> {
       if (_isServiceRunning) {
         // Send foundDeviceIds if available
         if (foundDeviceIds.isNotEmpty) {
-          Future.delayed(const Duration(seconds: 1));
+          Future.delayed(const Duration(milliseconds: 500));
           FlutterForegroundTask.sendDataToTask(foundDeviceIds);
           debugPrint(
               "Data sent to task: $foundDeviceIds data type: ${foundDeviceIds.runtimeType} ");
@@ -272,6 +268,8 @@ class HomeState extends State<Home> {
   }
 
   void _showUserInputDialog(BuildContext context) {
+    // create a dialog to input user data
+    // and save it to the database
     String firstName = '';
     String lastName = '';
 
@@ -328,7 +326,7 @@ class HomeState extends State<Home> {
               onPressed: () async {
                 if (firstName.isNotEmpty && lastName.isNotEmpty) {
                   final driver = Driver(name: firstName, surname: lastName);
-                  _store!.box<Driver>().put(driver);
+                  ObjectBox.store.box<Driver>().put(driver);
                   if (context.mounted) {
                     Navigator.of(context).pop();
                   }
@@ -348,6 +346,7 @@ class HomeState extends State<Home> {
   }
 
   Widget _buildServiceControlButtons() {
+    // buttons for services, TODO: move to separate page
     buttonBuilder(String text, {VoidCallback? onPressed}) {
       return ElevatedButton(
         onPressed: onPressed,
@@ -360,22 +359,16 @@ class HomeState extends State<Home> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          buttonBuilder('start BT service',
+          buttonBuilder('Start BT-Dienst',
               onPressed: !_isServiceRunning
                   ? () {
                       _startBluetoothService();
-                      setState(() {
-                        _isServiceRunning = true;
-                      });
                     }
                   : null),
-          buttonBuilder('stop BT service',
+          buttonBuilder('Stop BT-Dienst',
               onPressed: _isServiceRunning
                   ? () {
                       _stopBluetoothService();
-                      setState(() {
-                        _isServiceRunning = false;
-                      });
                     }
                   : null),
         ],
@@ -383,24 +376,22 @@ class HomeState extends State<Home> {
     );
   }
 
+  // thoughts: tripmodebuttons centered, and settings wheel on one corner
+  // add a settings page which includes things like permissions and service control
   @override
   Widget build(BuildContext context) {
-    if (_store == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
     return Scaffold(
         appBar: AppBar(
           title: const Text("NovaCorp - Fahrtenbuch"),
         ),
         body: Column(
           children: [
-            //if (driver != null) buildTripDetails(context, trip, driver),
-            //const Spacer(),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 // crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // TODO: make bigger and centered
                   ChooseTripModeButtons(
                     initialMode: TripCategory
                         .values[_prefs?.getInt('tripCategory2') ?? 0],
@@ -411,11 +402,6 @@ class HomeState extends State<Home> {
                       _prefs?.setInt('tripCategory2', _newModeIndex!) ?? 0;
                     },
                   ),
-                  ElevatedButton(
-                      onPressed: () => _reloadTimer == null
-                          ? startTaskAvailabilityListenerToSendData()
-                          : null,
-                      child: const Text("Start Task Availability Listener")),
                 ],
               ),
             ),
@@ -432,10 +418,12 @@ class HomeState extends State<Home> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // TODO: move to separate page
               ScanDevicesButton(
                 onScan: () => _customBluetoothService!.scanForDevices(),
               ),
               const SizedBox(height: 8),
+              // TODO: move to separate page
               PermissionsButton(
                 permissionGranted: arePermissionsGranted,
                 onPermissionStatusChanged: (bool granted) {

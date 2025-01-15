@@ -12,6 +12,7 @@ class DriverRepository {
   }
 
   // Get all drivers
+  // only for debugging, practically only one driver should exist
   List<Driver> getAllDrivers() {
     return _driverBox.getAll();
   }

@@ -1,3 +1,5 @@
+import 'package:elogbook/models/trip_status.dart';
+
 import '../models/trip.dart';
 import '../objectbox.g.dart';
 
@@ -24,5 +26,14 @@ class TripRepository {
   // Delete a trip
   void deleteTrip(int id) {
     _tripBox.remove(id);
+  }
+
+  // return all finished trips
+  // TODO: check functionality
+  List<Trip> getFinishedTrips() {
+    return _tripBox
+        .query(Trip_.tripStatus.equals(TripStatus.finished.toString()))
+        .build()
+        .find();
   }
 }

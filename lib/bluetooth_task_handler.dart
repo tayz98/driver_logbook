@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 import 'package:elogbook/controllers/trip_controller.dart';
 import 'package:elogbook/models/driver.dart';
 import 'package:elogbook/models/trip.dart';
+import 'package:elogbook/models/trip_location.dart';
 import 'package:elogbook/models/trip_status.dart';
 import 'package:elogbook/objectbox.dart';
+import 'package:elogbook/objectbox.g.dart';
 import 'package:elogbook/services/gps_service.dart';
 import 'package:elogbook/utils/extra.dart';
 import 'package:elogbook/utils/vehicle_utils.dart';
@@ -21,8 +23,8 @@ void startCallback() {
 
 class BluetoothTaskHandler extends TaskHandler {
   // Data
-  late ObjectBox _objectBox;
-  late TripController _tripController;
+  late Store _objectBox;
+  TripController? _tripController;
   late SharedPreferences _prefs;
 
   // Bluetooth
@@ -41,6 +43,7 @@ class BluetoothTaskHandler extends TaskHandler {
   Timer? _disconnectTimer;
   DateTime _lastMileageResponseTime = DateTime.now();
   int? tripCategoryIndex;
+  bool wasDataChecked = false;
 
   // misc
   GpsService? _gpsService;
@@ -49,19 +52,18 @@ class BluetoothTaskHandler extends TaskHandler {
   String? _vehicleVin;
   int? _vehicleMileage;
   Timer? mileageSendCommandTimer;
+  TripLocation _tempLocation = TripLocation(
+      street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
   String _responseBuffer = '';
   bool isElm327Initialized = false;
   final String skodaMileageCommand = "2210E01";
   final String vinCommand = "0902";
   final StreamController<void> _mileageResponseController =
       StreamController<void>.broadcast();
-  final ForegroundTaskOptions defaultTaskOptions = ForegroundTaskOptions(
-    eventAction: ForegroundTaskEventAction.repeat(4000),
-    autoRunOnBoot: true,
-    autoRunOnMyPackageReplaced: true,
-    allowWakeLock: true,
-    allowWifiLock: true,
-  );
+
+  // --------------------------------------------------------------------------
+  // PUBLIC METHODS: TaskHandler
+  // --------------------------------------------------------------------------
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -69,6 +71,7 @@ class BluetoothTaskHandler extends TaskHandler {
     await _initializeData();
     await _initializeBluetooth();
 
+    // listen for mileage response and update the last response time
     _mileageResponseController.stream.listen((_) {
       _lastMileageResponseTime = DateTime.now();
     });
@@ -76,57 +79,65 @@ class BluetoothTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    debugPrint(_objectBox.store.box<Trip>().getAll().toString());
-    debugPrint(_objectBox.store.box<Driver>().getAll().toString());
+    try {
+      // wait for initialization to complete before proceeding
+      await _initializationCompleter.future;
+      debugPrint(ObjectBox.store.box<Trip>().getAll().toString());
+      debugPrint(ObjectBox.store.box<Driver>().getAll().toString());
+      if (ObjectBox.store.box<Driver>().isEmpty()) {
+        debugPrint("Driver not found");
+        // TODO: either create a new driver or show a notification
+        return;
+      }
 
-    debugPrint('[BluetoothTaskHandler] onRepeatEvent: $timestamp');
-    debugPrint('[BluetoothTaskHandler] Connection state: $_connectionState');
-    //debugPrint('[BluetoothTaskHandler] Trip: ${_tripController.currentTrip}');
+      // debug
+      debugPrint('[BluetoothTaskHandler] onRepeatEvent: $timestamp');
+      debugPrint('[BluetoothTaskHandler] Connection state: $_connectionState');
+      debugPrint(
+          '[BluetoothTaskHandler] Trip: ${_tripController?.currentTrip}');
+      debugPrint('Known remote ids: $knownRemoteIds');
 
-    debugPrint('Known remote ids: $knownRemoteIds');
-    if (isElm327Initialized) {
-      if (_tripController.currentTrip != null &&
-          _tripController.currentTrip!.tripStatusEnum ==
-              TripStatus.inProgress) {
-        final difference =
-            DateTime.now().difference(_lastMileageResponseTime).inSeconds;
-        if (difference > 15) {
-          _endTelemetryCollection();
-          return;
+      if (isElm327Initialized) {
+        // only start telemetry collection if the elm327 controller is initialized
+        if (_tripController?.currentTrip != null &&
+            _tripController?.currentTrip?.tripStatusEnum ==
+                TripStatus.inProgress) {
+          final difference =
+              DateTime.now().difference(_lastMileageResponseTime).inSeconds;
+          if (difference > 15) {
+            debugPrint("No response from ELM327 for 15 seconds..Ending trip");
+            _endTelemetryCollection();
+            return;
+          }
         }
+        _tripController ??= TripController(ObjectBox.store, _prefs);
+        _gpsService ??= GpsService();
+        await _sendCommand(skodaMileageCommand); // query mileage continuously
+        await Future.delayed(
+            const Duration(seconds: 1)); // wait for the response
+        if (!wasDataChecked) {
+          await _checkData();
+        } else {
+          await _startOrUpdateTrip();
+        }
+        // if the elm327 has not responded and therefore the initialization has been set to false
+        // but the device is still connected and the driver  plans to start a consecutive trip
+        // the initialization has to be done again, maybe add another boolean like hasTripEnded for more robustness
+      } else if (_connectedDevice != null && !isElm327Initialized) {
+        await _initializeElm327();
       }
-      _gpsService ??= GpsService();
-      await _sendCommand(skodaMileageCommand);
-      await Future.delayed(const Duration(seconds: 1));
-      if (await _checkData() && _tripController.currentTrip != null) {
-        await _updateDiagnostics();
-      } else {
-        debugPrint("Data not valid or no trip started yet..Repeating");
-      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in onRepeatEvent: $e');
+      debugPrintStack(stackTrace: stackTrace);
     }
-
-    // Send data to main isolate if needed
-    // final Map<String, dynamic> data = {
-    //   "event": "onRepeatEvent",
-    //   "timestampMillis": timestamp.millisecondsSinceEpoch,
-    // };
-    // FlutterForegroundTask.sendDataToMain(data);
   }
 
   @override
   void onReceiveData(Object data) async {
-    if (data is Map && data['command'] == 'get_store_reference') {
-      debugPrint(
-          '[BluetoothTaskHandler] Received command: get_store_reference');
-
-      final ByteData storeRef = _objectBox.store.reference;
-      final List<int> serializedStoreRef = storeRef.buffer.asUint8List();
-      FlutterForegroundTask.sendDataToMain({'storeRef': serializedStoreRef});
-    }
     debugPrint(
         '[BluetoothTaskHandler] onReceiveData: $data type: ${data.runtimeType}');
 
-    await _initializationCompleter.future;
+    // only the trip category index is received as int from the main app
     if (data is int) {
       tripCategoryIndex = data;
       if (tripCategoryIndex != null &&
@@ -135,6 +146,7 @@ class BluetoothTaskHandler extends TaskHandler {
         debugPrint("New Trip category index: $tripCategoryIndex");
         _prefs.setInt('tripCategory2', tripCategoryIndex!);
       }
+      // TODO: check which type is needed to handle following data
     } else if (data is List<dynamic>) {
       debugPrint("Data is List<dynamic>");
       final newRemoteIds = data.cast<String>();
@@ -210,9 +222,26 @@ class BluetoothTaskHandler extends TaskHandler {
     if (_connectedDevice != null) {
       await _disposeConnection(_connectedDevice!);
     }
+    // if any trip was in progress, cancel it
+    if (Platform.isAndroid && _tripController?.currentTrip != null) {
+      _tripController!.cancelTrip(_tempLocation);
+    }
+    // on ios: maybe pause and resume, because tasks could be destroyed more often
     _objectBox.close();
+    _tripController = null;
     debugPrint('[BluetoothTaskHandler] onDestroy');
     // Cleanup resources
+  }
+
+  // --------------------------------------------------------------------------
+  //  METHODS: Task related
+  // --------------------------------------------------------------------------
+
+  void updateNotificationText(String newTitle, String newText) {
+    FlutterForegroundTask.updateService(
+      notificationTitle: newTitle,
+      notificationText: newText,
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -222,7 +251,9 @@ class BluetoothTaskHandler extends TaskHandler {
   Future<void> _initializeBluetooth() async {
     debugPrint('[BluetoothTaskHandler] Initializing Bluetooth...');
     FlutterBluePlus.setOptions(restoreState: true);
-    FlutterBluePlus.setLogLevel(LogLevel.verbose);
+    //FlutterBluePlus.setLogLevel(LogLevel.verbose);
+
+    // handle device when the connection state changes
     _connectionStateSubscription ??=
         FlutterBluePlus.events.onConnectionStateChanged.listen(
       (event) async {
@@ -230,6 +261,7 @@ class BluetoothTaskHandler extends TaskHandler {
         if (_connectionState == BluetoothConnectionState.connected) {
           _connectedDevice = event.device;
         }
+        // read rssi, disconnect if device is too far away
         final int currentRssi = await _connectedDevice!.readRssi();
         debugPrint(
             '[BluetoothTaskHandler] Device ${_connectedDevice!.remoteId.str} RSSI: $currentRssi');
@@ -238,16 +270,18 @@ class BluetoothTaskHandler extends TaskHandler {
               '[BluetoothTaskHandler] Disconnecting device due to low RSSI: $currentRssi');
           await _disposeConnection(_connectedDevice!);
         }
+        // request MTU and discover characteristics if connected
         await _requestMtu(_connectedDevice!);
         await _discoverCharacteristics(_connectedDevice!);
+        // check rssi continously to disconnect the device if it is too far away
         _trackRssi(
             dev: _connectedDevice!, interval: const Duration(seconds: 5));
         if (_connectionState == BluetoothConnectionState.disconnected) {
           if (_connectedDevice != null) {
             await _disposeConnection(_connectedDevice!);
           }
-          // needed because when disconnect() is used on autoConnect
-          // the device is not auto connecting anymore
+          // needed because when disconnect() is used with the autoConnect parameter
+          // it doesn't reconnect automatically anymore
           Future.delayed(const Duration(seconds: 10), () {
             // longer delay to prevent reconnecting to the same device if other devices are available
             _lastConnectedDevice?.connectAndUpdateStream();
@@ -306,6 +340,8 @@ class BluetoothTaskHandler extends TaskHandler {
 
     if (_writeCharacteristic != null && _notifyCharacteristic != null) {
       await _notifyCharacteristic!.setNotifyValue(true);
+      // only initialize elm327 if the needed characteristics are found
+      // and listen for incoming data
       await _initializeElm327();
       _notifyCharacteristic!.lastValueStream.listen(handleReceivedData);
     }
@@ -325,24 +361,24 @@ class BluetoothTaskHandler extends TaskHandler {
     debugPrint(
         '[BluetoothTaskHandler] Disconnecting device: ${_connectedDevice!.remoteId.str}');
     _lastConnectedDevice = dev;
+    await _connectedDevice?.disconnectAndUpdateStream();
     _connectedDevice = null;
     _writeCharacteristic = null;
     _notifyCharacteristic = null;
     await _rssiStreamSubscription?.cancel();
     _rssiStreamSubscription = null;
-    await _connectedDevice?.disconnectAndUpdateStream();
   }
 
   Future<void> _initializeData() async {
     debugPrint('[BluetoothTaskHandler] Initializing data...');
     _prefs = await SharedPreferences.getInstance();
     try {
-      _objectBox = await ObjectBox.create();
+      await ObjectBox.create();
     } catch (e) {
       debugPrint('[BluetoothTaskHandler] ObjectBox error: $e');
     }
     debugPrint('[BluetoothTaskHandler] Initialized ObjectBox');
-    _tripController = TripController(_objectBox.store, _prefs);
+    _tripController = TripController(ObjectBox.store, _prefs);
     debugPrint('[BluetoothTaskHandler] Initialized SharedPreferences');
     knownRemoteIds = _prefs.getStringList("knownRemoteIds") ?? [];
     debugPrint('[BluetoothTaskHandler] Initialized knownRemoteIds');
@@ -370,7 +406,7 @@ class BluetoothTaskHandler extends TaskHandler {
             final device = BluetoothDevice.fromId(id);
             _knownDevices.add(device);
             await device.connectAndUpdateStream();
-            await Future.delayed(const Duration(seconds: 1));
+            await Future.delayed(const Duration(milliseconds: 500));
           } catch (e) {
             debugPrint('[BluetoothTaskHandler] Connect error: $e');
             return;
@@ -411,7 +447,11 @@ class BluetoothTaskHandler extends TaskHandler {
     debugPrint("Sending command: $command");
     String fullCommand = "$command\r";
     List<int> bytes = utf8.encode(fullCommand);
-    await _writeCharacteristic?.write(bytes, withoutResponse: true);
+    try {
+      await _writeCharacteristic?.write(bytes, withoutResponse: true);
+    } catch (e) {
+      debugPrint("Error in _sendCommand: $e");
+    }
   }
 
   // check if VIN and mileage are valid
@@ -420,20 +460,18 @@ class BluetoothTaskHandler extends TaskHandler {
     bool vin = await _checkVin();
     bool mileage =
         _checkMileageOfSkoda(); // mileage already known by now, that's why it's not awaited
+    if (vin && mileage) {
+      wasDataChecked = true;
+    }
     return vin && mileage;
   }
 
   // check if VIN is valid
   Future<bool> _checkVin() async {
     if (_vehicleVin == null) {
-      for (int i = 0; i < 3; i++) {
-        await _sendCommand(vinCommand);
-        // if VIN takes too long to receive, send the command again
-        await Future.delayed(const Duration(milliseconds: 2000));
-        if (_vehicleVin != null) {
-          break;
-        }
-      }
+      await _sendCommand(vinCommand);
+      await Future.delayed(const Duration(milliseconds: 2500));
+      // wait for the response (could take longer then usual)
     }
 
     if (_vehicleVin?.length == 17) {
@@ -516,31 +554,48 @@ class BluetoothTaskHandler extends TaskHandler {
     _mileageResponseController.add(null);
   }
 
-  Future<void> _updateDiagnostics() async {
-    if (_tripController.currentTrip == null) {
-      final position = await _gpsService!.currentPosition();
-      final location = await _gpsService!.getLocationFromPosition(position);
-      _tripController.startTrip(_vehicleMileage!, _vehicleVin!, location);
-    } else {
-      _tripController.updateMileage(_vehicleMileage!);
+  Future<void> _startOrUpdateTrip() async {
+    try {
+      if (_tripController!.currentTrip == null) {
+        try {
+          final position = await _gpsService!.currentPosition;
+          debugPrint("Position: $position");
+          _tempLocation = await _gpsService!.getLocationFromPosition(position);
+        } catch (e) {
+          debugPrint("Error in _updateTrip: $e");
+          _tempLocation = TripLocation(
+              street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
+        }
+        debugPrint("Location: $_tempLocation");
+        debugPrint("Creating new trip...");
+        _tripController!
+            .startTrip(_vehicleMileage!, _vehicleVin!, _tempLocation);
+        // TODO: update notification
+        debugPrint(_tripController?.currentTrip.toString());
+      } else {
+        _tripController!.updateMileage(_vehicleMileage!);
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in _updateDiagnostics: $e');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   Future<void> _endTelemetryCollection() async {
+    // TODO: update notification
     debugPrint("Ending telemetry collection...");
-    final endPosition = await _gpsService!.currentPosition();
-    final endLocation = await _gpsService!.getLocationFromPosition(endPosition);
+    try {
+      final endPosition = await _gpsService!.currentPosition;
+      _tempLocation = await _gpsService!.getLocationFromPosition(endPosition);
+    } catch (e) {
+      debugPrint("Error in _endTelemetryCollection: $e");
+      _tempLocation = TripLocation(
+          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
+    }
     _gpsService = null;
-    _tripController.endTrip(endLocation);
+    _tripController!.endTrip(_tempLocation);
     if (_connectedDevice != null) {
       await _disposeConnection(_connectedDevice!);
     }
-  }
-
-  void _sendStoreReferenceToMain() {
-    final ByteData storeRef = _objectBox.store.reference;
-    // Send the store reference to the main isolate
-    FlutterForegroundTask.sendDataToMain(storeRef);
-    debugPrint('[BluetoothTaskHandler] Sent store reference to main isolate');
   }
 }
