@@ -1,27 +1,26 @@
-import 'package:elogbook/models/trip.dart';
 import 'package:objectbox/objectbox.dart';
 import 'package:uuid/uuid.dart';
+
+enum DrivePermissions { business, personal, both }
 
 @Entity()
 class Driver {
   @Id()
   int id = 0;
   //bool isAuthorized = false;
-  bool isAllowedToDoPrivateTrips = false;
-  final String name;
-  final String surname;
+  String drivePermissions = DrivePermissions.business.toString();
+  final String firstName;
+  final String lastName;
 
   @Index()
   @Unique()
   String uid;
 
-  @Backlink()
-  final trips = ToMany<Trip>();
-
-  Driver({required this.name, required this.surname}) : uid = const Uuid().v4();
+  Driver({required this.firstName, required this.lastName})
+      : uid = const Uuid().v4();
 
   @override
   String toString() {
-    return 'Driver{id: $id, name: $name, surname: $surname, isAllowedToDoPrivateTrips: $isAllowedToDoPrivateTrips, uid: $uid}';
+    return 'Driver{id: $id, name: $firstName, surname: $lastName, drivePermissions: $drivePermissions, uid: $uid}';
   }
 }

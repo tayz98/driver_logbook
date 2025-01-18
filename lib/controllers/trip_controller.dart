@@ -1,12 +1,14 @@
+import 'dart:convert';
+
 import 'package:elogbook/models/driver.dart';
 import 'package:elogbook/models/trip.dart';
 import 'package:elogbook/models/trip_category.dart';
 import 'package:elogbook/models/trip_location.dart';
 import 'package:elogbook/models/trip_status.dart';
-import 'package:elogbook/objectbox.g.dart';
 import 'package:elogbook/repositories/driver_repository.dart';
 import 'package:elogbook/repositories/trip_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:objectbox/objectbox.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TripController {
@@ -36,8 +38,8 @@ class TripController {
       tripCategory:
           TripCategory.values[_prefs.getInt('tripCategory2') ?? 0].toString(),
       tripStatus: TripStatus.inProgress.toString(),
+      startLocationJson: jsonEncode(startLocation),
     );
-    _currentTrip!.startLocation.target = startLocation;
   }
 
   void changeCategory(TripCategory newCategory) async {
@@ -49,20 +51,20 @@ class TripController {
         'tripCategory2', TripCategory.values.indexOf(newCategory));
   }
 
-  void updateMileage(int mileage) {
-    if (_currentTrip == null) {
-      debugPrint("Trip not found");
-      throw Exception('Trip not found');
-    } else if (mileage <= _currentTrip!.startMileage) {
-      debugPrint("Mileage didn't increase");
-      return;
-    } else {
-      _currentTrip!.currentMileage = mileage;
-      debugPrint("Mileage updated");
-    }
-  }
+  // void updateMileage(int mileage) {
+  //   if (_currentTrip == null) {
+  //     debugPrint("Trip not found");
+  //     throw Exception('Trip not found');
+  //   } else if (mileage <= _currentTrip!.startMileage) {
+  //     debugPrint("Mileage didn't increase");
+  //     return;
+  //   } else {
+  //     _currentTrip!.currentMileage = mileage;
+  //     debugPrint("Mileage updated");
+  //   }
+  // }
 
-  void endTrip(TripLocation? endLocation) {
+  void endTrip(TripLocation? endLocation, int mileage) {
     if (_currentTrip == null) {
       debugPrint("Trip not found");
       throw Exception('Trip not found');
@@ -70,34 +72,34 @@ class TripController {
     _currentTrip!.tripStatus = TripStatus.finished.toString();
     if (endLocation == null) {
       debugPrint("End location not found");
-      _currentTrip!.endLocation.target = TripLocation(
-          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
+      _currentTrip!.endLocationJson = jsonEncode(TripLocation(
+          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt"));
     } else {
-      _currentTrip!.endLocation.target = endLocation;
+      _currentTrip!.endLocationJson = jsonEncode(endLocation);
     }
     _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
-    _currentTrip!.endMileage = _currentTrip!.currentMileage;
+    _currentTrip!.endMileage = mileage;
     _currentTrip!.tripStatus = TripStatus.finished.toString();
     _tripRepository.saveTrip(_currentTrip!);
     _currentTrip = null;
   }
 
   // a use case could be to cancel a trip if the background task got destroyed.
-  void cancelTrip(TripLocation? endLocation) {
+  void cancelTrip(TripLocation? endLocation, int? mileage) {
     if (_currentTrip == null) {
       debugPrint("Trip not found");
       throw Exception('Trip not found');
     }
     if (endLocation == null) {
       debugPrint("End location not found");
-      _currentTrip!.endLocation.target = TripLocation(
-          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
+      _currentTrip!.endLocationJson = jsonEncode(TripLocation(
+          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt"));
     } else {
-      _currentTrip!.endLocation.target = endLocation;
+      _currentTrip!.endLocationJson = jsonEncode(endLocation);
     }
     _currentTrip!.tripStatus = TripStatus.cancelled.toString();
     _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
-    _currentTrip!.endMileage = _currentTrip!.currentMileage;
+    if (mileage != null) _currentTrip!.endMileage = mileage;
     _tripRepository.saveTrip(_currentTrip!);
     _currentTrip = null;
   }

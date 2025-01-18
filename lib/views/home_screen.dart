@@ -46,6 +46,8 @@ class HomeState extends State<Home> {
   @override
   initState() {
     super.initState();
+    ObjectBox.create();
+
     _customBluetoothService = CustomBluetoothService();
     SharedPreferences.getInstance().then((prefs) {
       setState(() {
@@ -213,7 +215,7 @@ class HomeState extends State<Home> {
 
     try {
       final result = await FlutterForegroundTask.startService(
-        notificationTitle: 'Vordergrunddienst läuft',
+        notificationTitle: 'NovaCorp Fahrtenbuch',
         notificationText:
             'Die Aufzeichnung von Fahrten kann jederzeit gestartet werden!',
         callback: startCallback,
@@ -325,7 +327,8 @@ class HomeState extends State<Home> {
               ),
               onPressed: () async {
                 if (firstName.isNotEmpty && lastName.isNotEmpty) {
-                  final driver = Driver(name: firstName, surname: lastName);
+                  final driver =
+                      Driver(firstName: firstName, lastName: lastName);
                   ObjectBox.store.box<Driver>().put(driver);
                   if (context.mounted) {
                     Navigator.of(context).pop();

@@ -16,7 +16,6 @@ import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
 import 'models/driver.dart';
 import 'models/trip.dart';
-import 'models/trip_location.dart';
 
 export 'package:objectbox/objectbox.dart'; // so that callers only have to import this file
 
@@ -24,7 +23,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
       id: const obx_int.IdUid(1, 6912504348649240809),
       name: 'Driver',
-      lastPropertyId: const obx_int.IdUid(7, 9032816223888766268),
+      lastPropertyId: const obx_int.IdUid(10, 1948612003747309004),
       flags: 0,
       properties: <obx_int.ModelProperty>[
         obx_int.ModelProperty(
@@ -33,35 +32,33 @@ final _entities = <obx_int.ModelEntity>[
             type: 6,
             flags: 1),
         obx_int.ModelProperty(
-            id: const obx_int.IdUid(4, 8462103263919081522),
-            name: 'isAllowedToDoPrivateTrips',
-            type: 1,
-            flags: 0),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(5, 2900811730491421924),
-            name: 'name',
-            type: 9,
-            flags: 0),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(6, 2819295180917484206),
-            name: 'surname',
-            type: 9,
-            flags: 0),
-        obx_int.ModelProperty(
             id: const obx_int.IdUid(7, 9032816223888766268),
             name: 'uid',
             type: 9,
             flags: 2080,
-            indexId: const obx_int.IdUid(6, 8081175554485677451))
+            indexId: const obx_int.IdUid(6, 8081175554485677451)),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(8, 7835324415654395656),
+            name: 'drivePermissions',
+            type: 9,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(9, 3832763960385620046),
+            name: 'firstName',
+            type: 9,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(10, 1948612003747309004),
+            name: 'lastName',
+            type: 9,
+            flags: 0)
       ],
       relations: <obx_int.ModelRelation>[],
-      backlinks: <obx_int.ModelBacklink>[
-        obx_int.ModelBacklink(name: 'trips', srcEntity: 'Trip', srcField: '')
-      ]),
+      backlinks: <obx_int.ModelBacklink>[]),
   obx_int.ModelEntity(
       id: const obx_int.IdUid(5, 1832358271218994760),
       name: 'Trip',
-      lastPropertyId: const obx_int.IdUid(14, 1659708753855515667),
+      lastPropertyId: const obx_int.IdUid(16, 5922150338539166868),
       flags: 0,
       properties: <obx_int.ModelProperty>[
         obx_int.ModelProperty(
@@ -69,20 +66,6 @@ final _entities = <obx_int.ModelEntity>[
             name: 'id',
             type: 6,
             flags: 1),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(2, 8087349748054237338),
-            name: 'startLocationId',
-            type: 11,
-            flags: 520,
-            indexId: const obx_int.IdUid(3, 1618193787246806027),
-            relationTarget: 'TripLocation'),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(3, 5385960739147473959),
-            name: 'endLocationId',
-            type: 11,
-            flags: 520,
-            indexId: const obx_int.IdUid(4, 1724532676930884542),
-            relationTarget: 'TripLocation'),
         obx_int.ModelProperty(
             id: const obx_int.IdUid(4, 795573068566224104),
             name: 'startMileage',
@@ -104,11 +87,6 @@ final _entities = <obx_int.ModelEntity>[
             type: 9,
             flags: 0),
         obx_int.ModelProperty(
-            id: const obx_int.IdUid(11, 7702087421946930035),
-            name: 'currentMileage',
-            type: 6,
-            flags: 0),
-        obx_int.ModelProperty(
             id: const obx_int.IdUid(12, 3868884046055870958),
             name: 'tripCategory',
             type: 9,
@@ -124,34 +102,15 @@ final _entities = <obx_int.ModelEntity>[
             type: 11,
             flags: 520,
             indexId: const obx_int.IdUid(7, 9100210303411249520),
-            relationTarget: 'Driver')
-      ],
-      relations: <obx_int.ModelRelation>[],
-      backlinks: <obx_int.ModelBacklink>[]),
-  obx_int.ModelEntity(
-      id: const obx_int.IdUid(8, 7146167246693813417),
-      name: 'TripLocation',
-      lastPropertyId: const obx_int.IdUid(4, 4760103922227303277),
-      flags: 0,
-      properties: <obx_int.ModelProperty>[
+            relationTarget: 'Driver'),
         obx_int.ModelProperty(
-            id: const obx_int.IdUid(1, 6026804955087671822),
-            name: 'id',
-            type: 6,
-            flags: 1),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(2, 1559457446283192550),
-            name: 'street',
+            id: const obx_int.IdUid(15, 5333954269423663963),
+            name: 'startLocationJson',
             type: 9,
             flags: 0),
         obx_int.ModelProperty(
-            id: const obx_int.IdUid(3, 4400260653195643072),
-            name: 'city',
-            type: 9,
-            flags: 0),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(4, 4760103922227303277),
-            name: 'postalCode',
+            id: const obx_int.IdUid(16, 5922150338539166868),
+            name: 'endLocationJson',
             type: 9,
             flags: 0)
       ],
@@ -203,9 +162,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
         522391902727584447,
         800457783229245686,
         2191456460352204353,
-        4749663025170053776
+        4749663025170053776,
+        7146167246693813417
       ],
-      retiredIndexUids: const [],
+      retiredIndexUids: const [1618193787246806027, 1724532676930884542],
       retiredPropertyUids: const [
         5169966380460749462,
         1063782334860157701,
@@ -223,7 +183,17 @@ obx_int.ModelDefinition getObjectBoxModel() {
         1125954922849964380,
         5605056955698089737,
         8297823567899394019,
-        1104393838953814765
+        1104393838953814765,
+        7702087421946930035,
+        8462103263919081522,
+        2900811730491421924,
+        2819295180917484206,
+        8087349748054237338,
+        5385960739147473959,
+        6026804955087671822,
+        1559457446283192550,
+        4400260653195643072,
+        4760103922227303277
       ],
       retiredRelationUids: const [7730691983047863070],
       modelVersion: 5,
@@ -234,52 +204,46 @@ obx_int.ModelDefinition getObjectBoxModel() {
     Driver: obx_int.EntityDefinition<Driver>(
         model: _entities[0],
         toOneRelations: (Driver object) => [],
-        toManyRelations: (Driver object) => {
-              obx_int.RelInfo<Trip>.toOneBacklink(
-                      14, object.id, (Trip srcObject) => srcObject.driver):
-                  object.trips
-            },
+        toManyRelations: (Driver object) => {},
         getId: (Driver object) => object.id,
         setId: (Driver object, int id) {
           object.id = id;
         },
         objectToFB: (Driver object, fb.Builder fbb) {
-          final nameOffset = fbb.writeString(object.name);
-          final surnameOffset = fbb.writeString(object.surname);
           final uidOffset = fbb.writeString(object.uid);
-          fbb.startTable(8);
+          final drivePermissionsOffset =
+              fbb.writeString(object.drivePermissions);
+          final firstNameOffset = fbb.writeString(object.firstName);
+          final lastNameOffset = fbb.writeString(object.lastName);
+          fbb.startTable(11);
           fbb.addInt64(0, object.id);
-          fbb.addBool(3, object.isAllowedToDoPrivateTrips);
-          fbb.addOffset(4, nameOffset);
-          fbb.addOffset(5, surnameOffset);
           fbb.addOffset(6, uidOffset);
+          fbb.addOffset(7, drivePermissionsOffset);
+          fbb.addOffset(8, firstNameOffset);
+          fbb.addOffset(9, lastNameOffset);
           fbb.finish(fbb.endTable());
           return object.id;
         },
         objectFromFB: (obx.Store store, ByteData fbData) {
           final buffer = fb.BufferContext(fbData);
           final rootOffset = buffer.derefObject(0);
-          final nameParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 12, '');
-          final surnameParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 14, '');
-          final object = Driver(name: nameParam, surname: surnameParam)
+          final firstNameParam = const fb.StringReader(asciiOptimization: true)
+              .vTableGet(buffer, rootOffset, 20, '');
+          final lastNameParam = const fb.StringReader(asciiOptimization: true)
+              .vTableGet(buffer, rootOffset, 22, '');
+          final object = Driver(
+              firstName: firstNameParam, lastName: lastNameParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
-            ..isAllowedToDoPrivateTrips =
-                const fb.BoolReader().vTableGet(buffer, rootOffset, 10, false)
             ..uid = const fb.StringReader(asciiOptimization: true)
-                .vTableGet(buffer, rootOffset, 16, '');
-          obx_int.InternalToManyAccess.setRelInfo<Driver>(
-              object.trips,
-              store,
-              obx_int.RelInfo<Trip>.toOneBacklink(
-                  14, object.id, (Trip srcObject) => srcObject.driver));
+                .vTableGet(buffer, rootOffset, 16, '')
+            ..drivePermissions = const fb.StringReader(asciiOptimization: true)
+                .vTableGet(buffer, rootOffset, 18, '');
+
           return object;
         }),
     Trip: obx_int.EntityDefinition<Trip>(
         model: _entities[1],
-        toOneRelations: (Trip object) =>
-            [object.startLocation, object.endLocation, object.driver],
+        toOneRelations: (Trip object) => [object.driver],
         toManyRelations: (Trip object) => {},
         getId: (Trip object) => object.id,
         setId: (Trip object, int id) {
@@ -292,18 +256,22 @@ obx_int.ModelDefinition getObjectBoxModel() {
               : fbb.writeString(object.endTimestamp!);
           final tripCategoryOffset = fbb.writeString(object.tripCategory);
           final tripStatusOffset = fbb.writeString(object.tripStatus);
-          fbb.startTable(15);
+          final startLocationJsonOffset =
+              fbb.writeString(object.startLocationJson);
+          final endLocationJsonOffset = object.endLocationJson == null
+              ? null
+              : fbb.writeString(object.endLocationJson!);
+          fbb.startTable(17);
           fbb.addInt64(0, object.id);
-          fbb.addInt64(1, object.startLocation.targetId);
-          fbb.addInt64(2, object.endLocation.targetId);
           fbb.addInt64(3, object.startMileage);
           fbb.addInt64(4, object.endMileage);
           fbb.addOffset(5, vinOffset);
           fbb.addOffset(6, endTimestampOffset);
-          fbb.addInt64(10, object.currentMileage);
           fbb.addOffset(11, tripCategoryOffset);
           fbb.addOffset(12, tripStatusOffset);
           fbb.addInt64(13, object.driver.targetId);
+          fbb.addOffset(14, startLocationJsonOffset);
+          fbb.addOffset(15, endLocationJsonOffset);
           fbb.finish(fbb.endTable());
           return object.id;
         },
@@ -322,6 +290,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
                   .vTableGet(buffer, rootOffset, 26, '');
           final tripStatusParam = const fb.StringReader(asciiOptimization: true)
               .vTableGet(buffer, rootOffset, 28, '');
+          final startLocationJsonParam =
+              const fb.StringReader(asciiOptimization: true)
+                  .vTableGet(buffer, rootOffset, 32, '');
+          final endLocationJsonParam =
+              const fb.StringReader(asciiOptimization: true)
+                  .vTableGetNullable(buffer, rootOffset, 34);
           final endMileageParam =
               const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 12);
           final endTimestampParam =
@@ -333,53 +307,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
               vin: vinParam,
               tripCategory: tripCategoryParam,
               tripStatus: tripStatusParam,
+              startLocationJson: startLocationJsonParam,
+              endLocationJson: endLocationJsonParam,
               endMileage: endMileageParam,
               endTimestamp: endTimestampParam)
-            ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
-            ..currentMileage =
-                const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0);
-          object.startLocation.targetId =
-              const fb.Int64Reader().vTableGet(buffer, rootOffset, 6, 0);
-          object.startLocation.attach(store);
-          object.endLocation.targetId =
-              const fb.Int64Reader().vTableGet(buffer, rootOffset, 8, 0);
-          object.endLocation.attach(store);
-          object.driver.attach(store);
-          return object;
-        }),
-    TripLocation: obx_int.EntityDefinition<TripLocation>(
-        model: _entities[2],
-        toOneRelations: (TripLocation object) => [],
-        toManyRelations: (TripLocation object) => {},
-        getId: (TripLocation object) => object.id,
-        setId: (TripLocation object, int id) {
-          object.id = id;
-        },
-        objectToFB: (TripLocation object, fb.Builder fbb) {
-          final streetOffset = fbb.writeString(object.street);
-          final cityOffset = fbb.writeString(object.city);
-          final postalCodeOffset = fbb.writeString(object.postalCode);
-          fbb.startTable(5);
-          fbb.addInt64(0, object.id);
-          fbb.addOffset(1, streetOffset);
-          fbb.addOffset(2, cityOffset);
-          fbb.addOffset(3, postalCodeOffset);
-          fbb.finish(fbb.endTable());
-          return object.id;
-        },
-        objectFromFB: (obx.Store store, ByteData fbData) {
-          final buffer = fb.BufferContext(fbData);
-          final rootOffset = buffer.derefObject(0);
-          final streetParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 6, '');
-          final cityParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 8, '');
-          final postalCodeParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 10, '');
-          final object = TripLocation(
-              street: streetParam, city: cityParam, postalCode: postalCodeParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
-
+          object.driver.attach(store);
           return object;
         })
   };
@@ -393,24 +326,21 @@ class Driver_ {
   static final id =
       obx.QueryIntegerProperty<Driver>(_entities[0].properties[0]);
 
-  /// See [Driver.isAllowedToDoPrivateTrips].
-  static final isAllowedToDoPrivateTrips =
-      obx.QueryBooleanProperty<Driver>(_entities[0].properties[1]);
-
-  /// See [Driver.name].
-  static final name =
-      obx.QueryStringProperty<Driver>(_entities[0].properties[2]);
-
-  /// See [Driver.surname].
-  static final surname =
-      obx.QueryStringProperty<Driver>(_entities[0].properties[3]);
-
   /// See [Driver.uid].
   static final uid =
-      obx.QueryStringProperty<Driver>(_entities[0].properties[4]);
+      obx.QueryStringProperty<Driver>(_entities[0].properties[1]);
 
-  /// see [Driver.trips]
-  static final trips = obx.QueryBacklinkToMany<Trip, Driver>(Trip_.driver);
+  /// See [Driver.drivePermissions].
+  static final drivePermissions =
+      obx.QueryStringProperty<Driver>(_entities[0].properties[2]);
+
+  /// See [Driver.firstName].
+  static final firstName =
+      obx.QueryStringProperty<Driver>(_entities[0].properties[3]);
+
+  /// See [Driver.lastName].
+  static final lastName =
+      obx.QueryStringProperty<Driver>(_entities[0].properties[4]);
 }
 
 /// [Trip] entity fields to define ObjectBox queries.
@@ -418,61 +348,38 @@ class Trip_ {
   /// See [Trip.id].
   static final id = obx.QueryIntegerProperty<Trip>(_entities[1].properties[0]);
 
-  /// See [Trip.startLocation].
-  static final startLocation =
-      obx.QueryRelationToOne<Trip, TripLocation>(_entities[1].properties[1]);
-
-  /// See [Trip.endLocation].
-  static final endLocation =
-      obx.QueryRelationToOne<Trip, TripLocation>(_entities[1].properties[2]);
-
   /// See [Trip.startMileage].
   static final startMileage =
-      obx.QueryIntegerProperty<Trip>(_entities[1].properties[3]);
+      obx.QueryIntegerProperty<Trip>(_entities[1].properties[1]);
 
   /// See [Trip.endMileage].
   static final endMileage =
-      obx.QueryIntegerProperty<Trip>(_entities[1].properties[4]);
+      obx.QueryIntegerProperty<Trip>(_entities[1].properties[2]);
 
   /// See [Trip.vin].
-  static final vin = obx.QueryStringProperty<Trip>(_entities[1].properties[5]);
+  static final vin = obx.QueryStringProperty<Trip>(_entities[1].properties[3]);
 
   /// See [Trip.endTimestamp].
   static final endTimestamp =
-      obx.QueryStringProperty<Trip>(_entities[1].properties[6]);
-
-  /// See [Trip.currentMileage].
-  static final currentMileage =
-      obx.QueryIntegerProperty<Trip>(_entities[1].properties[7]);
+      obx.QueryStringProperty<Trip>(_entities[1].properties[4]);
 
   /// See [Trip.tripCategory].
   static final tripCategory =
-      obx.QueryStringProperty<Trip>(_entities[1].properties[8]);
+      obx.QueryStringProperty<Trip>(_entities[1].properties[5]);
 
   /// See [Trip.tripStatus].
   static final tripStatus =
-      obx.QueryStringProperty<Trip>(_entities[1].properties[9]);
+      obx.QueryStringProperty<Trip>(_entities[1].properties[6]);
 
   /// See [Trip.driver].
   static final driver =
-      obx.QueryRelationToOne<Trip, Driver>(_entities[1].properties[10]);
-}
+      obx.QueryRelationToOne<Trip, Driver>(_entities[1].properties[7]);
 
-/// [TripLocation] entity fields to define ObjectBox queries.
-class TripLocation_ {
-  /// See [TripLocation.id].
-  static final id =
-      obx.QueryIntegerProperty<TripLocation>(_entities[2].properties[0]);
+  /// See [Trip.startLocationJson].
+  static final startLocationJson =
+      obx.QueryStringProperty<Trip>(_entities[1].properties[8]);
 
-  /// See [TripLocation.street].
-  static final street =
-      obx.QueryStringProperty<TripLocation>(_entities[2].properties[1]);
-
-  /// See [TripLocation.city].
-  static final city =
-      obx.QueryStringProperty<TripLocation>(_entities[2].properties[2]);
-
-  /// See [TripLocation.postalCode].
-  static final postalCode =
-      obx.QueryStringProperty<TripLocation>(_entities[2].properties[3]);
+  /// See [Trip.endLocationJson].
+  static final endLocationJson =
+      obx.QueryStringProperty<Trip>(_entities[1].properties[9]);
 }

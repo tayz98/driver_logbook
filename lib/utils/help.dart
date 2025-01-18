@@ -2,17 +2,17 @@ import 'package:elogbook/models/trip_category.dart';
 import 'package:intl/intl.dart';
 
 class Helper {
-  static Future<String> formatDateString(String? raw) async {
+  static String formatDateString(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
-      return 'Ungültiges Datum';
+      return raw ?? '';
     }
 
     DateTime? parsed = _normalizeAndParseDateTime(raw);
     if (parsed == null) {
-      return 'Ungültiges Datum';
+      return raw;
     }
 
-    return DateFormat('dd.MM.yyyy HH:mm').format(parsed);
+    return DateFormat('dd.MM.yyyy HH:mm:ss').format(parsed);
   }
 
   static DateTime? _normalizeAndParseDateTime(String raw) {

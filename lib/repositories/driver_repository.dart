@@ -1,6 +1,5 @@
 import 'package:objectbox/objectbox.dart';
 import '../models/driver.dart';
-import '../models/trip.dart';
 
 class DriverRepository {
   final Box<Driver> _driverBox;
@@ -9,18 +8,6 @@ class DriverRepository {
 
   Driver? getDriver() {
     return _driverBox.getAll().firstOrNull;
-  }
-
-  // Get all drivers
-  // only for debugging, practically only one driver should exist
-  List<Driver> getAllDrivers() {
-    return _driverBox.getAll();
-  }
-
-  List<Trip> getTripsForDriver() {
-    final driver = getDriver();
-    if (driver == null) return [];
-    return driver.trips.toList();
   }
 
   // Save a driver

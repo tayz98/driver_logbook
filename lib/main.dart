@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:elogbook/notification_configuration.dart';
-import 'package:elogbook/objectbox.dart';
 import 'package:elogbook/views/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,7 +19,6 @@ const String portName = 'notification_send_port';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterForegroundTask.initCommunicationPort();
-  ObjectBox.create();
   await initializeDateFormatting('de_DE');
   Intl.defaultLocale = 'de_DE';
   //await LogService.initializeLogFile();
