@@ -26,6 +26,7 @@ class TripController {
   }
 
   void startTrip(int mileage, String vin, TripLocation startLocation) {
+    _prefs.reload();
     _currentDriver = _driverRepository.getDriver();
     if (_currentDriver == null) {
       debugPrint("Driver not found");
@@ -38,7 +39,7 @@ class TripController {
       tripCategory:
           TripCategory.values[_prefs.getInt('tripCategory2') ?? 0].toString(),
       tripStatus: TripStatus.inProgress.toString(),
-      startLocationJson: jsonEncode(startLocation),
+      startLocationJson: jsonEncode(startLocation.toJson()),
     );
   }
 
@@ -73,9 +74,10 @@ class TripController {
     if (endLocation == null) {
       debugPrint("End location not found");
       _currentTrip!.endLocationJson = jsonEncode(TripLocation(
-          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt"));
+              street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt")
+          .toJson());
     } else {
-      _currentTrip!.endLocationJson = jsonEncode(endLocation);
+      _currentTrip!.endLocationJson = jsonEncode(endLocation.toJson());
     }
     _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
     _currentTrip!.endMileage = mileage;
@@ -95,7 +97,7 @@ class TripController {
       _currentTrip!.endLocationJson = jsonEncode(TripLocation(
           street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt"));
     } else {
-      _currentTrip!.endLocationJson = jsonEncode(endLocation);
+      _currentTrip!.endLocationJson = jsonEncode(endLocation.toJson());
     }
     _currentTrip!.tripStatus = TripStatus.cancelled.toString();
     _currentTrip!.endTimestamp = DateTime.now().toIso8601String();

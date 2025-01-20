@@ -47,7 +47,7 @@ class Helper {
       case TripCategory.private:
         return "Privat";
       case TripCategory.business:
-        return "Geschäftlich";
+        return "Dienst";
       case TripCategory.commute:
         return "Arbeitsweg";
     }

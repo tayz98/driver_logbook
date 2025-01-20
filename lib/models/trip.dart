@@ -44,8 +44,13 @@ class Trip {
       TripStatus.values.firstWhere((e) => e.toString() == tripStatus);
 
   // Getter/Setter for startLocation
-  TripLocation get startLocation =>
-      TripLocation.fromJson(jsonDecode(startLocationJson));
+  TripLocation get startLocation {
+    if (startLocationJson.isEmpty) {
+      throw const FormatException("startLocationJson is empty");
+    }
+    return TripLocation.fromJson(jsonDecode(startLocationJson));
+  }
+
   set startLocation(TripLocation location) =>
       startLocationJson = jsonEncode(location.toJson());
 

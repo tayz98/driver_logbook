@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
+
 import 'secrets.dart' as secret;
 
 import 'package:http/http.dart' as http;
@@ -34,7 +36,12 @@ class HttpService {
         url = secret.driver;
         break;
     }
-    return await http.post(Uri.parse(url),
-        headers: _postHeaders, body: jsonEncode(body));
+    try {
+      return await http.post(Uri.parse(url),
+          headers: _postHeaders, body: jsonEncode(body));
+    } catch (e) {
+      debugPrint('Error: $e');
+      return http.Response('Error: $e', 500);
+    }
   }
 }

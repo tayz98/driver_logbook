@@ -20,6 +20,7 @@ import 'package:elogbook/services/http_service.dart';
 import 'package:elogbook/utils/help.dart';
 
 // maybe write a separate task handler for ios
+// if it is even possible to run a task like that on ios
 
 @pragma('vm:entry-point')
 void startCallback() {
@@ -103,23 +104,27 @@ class BluetoothTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    tripToSend = _store.box<Trip>().get(3);
-    debugPrint(jsonEncode(tripToSend?.toJson()));
-    debugPrint("Sending Trip: $tripToSend");
-    await HttpService().post(
-        type: ServiceType.trip,
-        body: tripToSend!
-            .toJson()
-            .map((key, value) => MapEntry(key, value.toString())));
+    // tripToSend = _store.box<Trip>().get(3);
+    // debugPrint(jsonEncode(tripToSend?.toJson()));
+    // debugPrint("Sending Trip: $tripToSend");
+    // await HttpService().post(
+    //     type: ServiceType.trip,
+    //     body: tripToSend!
+    //         .toJson()
+    //         .map((key, value) => MapEntry(key, value.toString())));
     //debugPrint(ObjectBox.store.box<Trip>().getAll().toString());
-
-    await HttpService().post(type: ServiceType.log, body: {
-      "status": "onRepeatEvent",
-      "connectionState": _connectionState.toString(),
-      "timestamp": Helper.formatDateString(DateTime.now().toString()),
-      "trip_status":
-          _tripController?.currentTrip?.tripStatusEnum.toString() ?? "unknown",
-    });
+    // try {
+    //   await HttpService().post(type: ServiceType.log, body: {
+    //     "status": "onRepeatEvent",
+    //     "connectionState": _connectionState.toString(),
+    //     "timestamp": Helper.formatDateString(DateTime.now().toString()),
+    //     "trip_status":
+    //         _tripController?.currentTrip?.tripStatusEnum.toString() ??
+    //             "unknown",
+    //   });
+    // } catch (e) {
+    //   debugPrint("Error in onRepeatEvent: $e");
+    // }
     if (_connectionState == BluetoothConnectionState.connected) {
       final int tempRssi = await _connectedDevice?.readRssi() ?? 0;
       if (tempRssi < _disconnectRssiThreshold) {
@@ -131,9 +136,9 @@ class BluetoothTaskHandler extends TaskHandler {
     }
     if (_connectionState == BluetoothConnectionState.disconnected ||
         await _connectedDevice!.isDisconnecting.first == true) {
-      await HttpService().post(type: ServiceType.log, body: {
-        "status": "device disconnected, returning from onRepeatEvent"
-      });
+      // await HttpService().post(type: ServiceType.log, body: {
+      //   "status": "device disconnected, returning from onRepeatEvent"
+      // });
       return;
     }
     await _initializationCompleter.future;
@@ -194,12 +199,12 @@ class BluetoothTaskHandler extends TaskHandler {
   void onReceiveData(Object data) async {
     debugPrint(
         '[BluetoothTaskHandler] onReceiveData: $data type: ${data.runtimeType}');
-    HttpService().post(type: ServiceType.log, body: {
-      "status": "onReceiveData",
-      "data": data.toString(),
-      "type": data.runtimeType.toString(),
-      "timestamp": Helper.formatDateString(DateTime.now().toString())
-    });
+    // HttpService().post(type: ServiceType.log, body: {
+    //   "status": "onReceiveData",
+    //   "data": data.toString(),
+    //   "type": data.runtimeType.toString(),
+    //   "timestamp": Helper.formatDateString(DateTime.now().toString())
+    // });
 
     // only the trip category index is received as int from the main app
     if (data is int) {
