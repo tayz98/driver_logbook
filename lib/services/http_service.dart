@@ -42,6 +42,7 @@ class HttpService {
     } catch (e) {
       debugPrint('Error: $e');
       return http.Response('Error: $e', 500);
+      // TODO: add more error handling (e.g. rethrow to caller and handle there)
     }
   }
 }
