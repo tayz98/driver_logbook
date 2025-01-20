@@ -132,7 +132,7 @@ void _showPermissionsDeniedDialog(BuildContext context) {
       return AlertDialog(
         title: const Text('Berechtigungen wurden verweigert'),
         content: const Text(
-          'Bitte die Berechtigungen manuell in den Einstellungen aktivieren, sonst funktioniert die App nicht.',
+          'Die App benötigt alle Berechtigungen, um korrekt zu funktionieren. Bitte aktivieren Sie alle Berechtigungen in den System-Einstellungen.',
         ),
         actions: [
           TextButton(

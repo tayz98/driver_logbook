@@ -91,7 +91,7 @@ class SettingsState extends State<Settings> {
                     label: "Bluetooth-Geräte suchen",
                     onPressed: () async {
                       try {
-                        // await widget.onScan();
+                        await widget.onScan();
                         if (foundDeviceIds.isNotEmpty) {
                           if (context.mounted) {
                             _showScanResultsDialog(context, foundDeviceIds);
@@ -105,18 +105,18 @@ class SettingsState extends State<Settings> {
                         debugPrint('Error: $e');
                       }
                     }),
-                const SizedBox(height: 8),
-                // Disable ui, category is set to business
-                CustomButton(
-                    label: "Berechtigungen anfordern",
-                    onPressed: arePermissionsGranted
-                        ? null
-                        : () async {
-                            await requestAllPermissions(context);
-                          }),
+                // Button useless because of permanently denied permissions
+                // const SizedBox(height: 8),
+                // CustomButton(
+                //     label: "Berechtigungen anfordern",
+                //     onPressed: arePermissionsGranted
+                //         ? null
+                //         : () async {
+                //             await requestAllPermissions(context);
+                //           }),
 
                 const SizedBox(height: 8),
-                // Allow the user to see the ui and set the category for a trip
+                // Allow the enduser to see the ui and set the category for a trip
                 CustomButton(
                     label: "Nutzer-Berechtigung einstellen",
                     onPressed: () {
