@@ -1,6 +1,6 @@
-import 'package:elogbook/models/trip_category.dart';
+import 'package:driver_logbook/models/trip_category.dart';
 import 'package:flutter/material.dart';
-import 'package:elogbook/utils/help.dart';
+import 'package:driver_logbook/utils/help.dart';
 
 class ChooseTripModeButtons extends StatelessWidget {
   final TripCategory initialMode;

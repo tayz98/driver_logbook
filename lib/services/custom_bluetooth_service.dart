@@ -1,28 +1,19 @@
-library telmetry_services;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'dart:async';
-import 'package:elogbook/models/globals.dart';
+import 'package:driver_logbook/models/globals.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CustomBluetoothService {
-  // Streams
-  // final StreamController<String> _logStreamController =
-  //     StreamController<String>.broadcast();
-  // Stream<String> get logStream => _logStreamController.stream;
-
-  // Stream<String> get telemetryLogStream =>
-  //     elm327Service?.elm327LogStream ?? const Stream.empty();
-
   // Subscriptions
   StreamSubscription<List<ScanResult>>? _scanResultsSubscription;
 
   // Bluetooth
 
   List<ScanResult> _scanResults = [];
-  final Guid _targetService = Guid("0000fff0-0000-1000-8000-00805f9b34fb");
-  final String _targetAdvName = "VEEPEAK";
+  final Guid _targetService = Guid(dotenv.get('targetService'));
+  final String _targetAdvName = dotenv.get('targetAdvName');
 
   CustomBluetoothService() {
     _initialize();
@@ -38,16 +29,6 @@ class CustomBluetoothService {
     _scanResultsSubscription?.cancel();
     _scanResultsSubscription = null;
   }
-
-  // Future<void> _saveDeviceIds(List<String> deviceIds) async {
-  //   for (var id in deviceIds) {
-  //     if (!_knownRemoteIds.contains(id)) {
-  //       _knownRemoteIds.add(id);
-  //     }
-  //   }
-  //   //await prefs.setStringList('knownRemoteIds', _knownRemoteIds);
-  //   FlutterForegroundTask.sendDataToTask(_knownRemoteIds);
-  // }
 
   Future<void> scanForDevices() async {
     try {

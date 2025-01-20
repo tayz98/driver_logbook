@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:elogbook/models/trip.dart';
-import 'package:elogbook/models/trip_category.dart';
-import 'package:elogbook/models/trip_location.dart';
-import 'package:elogbook/models/trip_status.dart';
-import 'package:elogbook/repositories/trip_repository.dart';
+import 'package:driver_logbook/models/trip.dart';
+import 'package:driver_logbook/models/trip_category.dart';
+import 'package:driver_logbook/models/trip_location.dart';
+import 'package:driver_logbook/models/trip_status.dart';
+import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:objectbox/objectbox.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,19 +41,6 @@ class TripController {
     await _prefs.setInt(
         'tripCategory2', TripCategory.values.indexOf(newCategory));
   }
-
-  // void updateMileage(int mileage) {
-  //   if (_currentTrip == null) {
-  //     debugPrint("Trip not found");
-  //     throw Exception('Trip not found');
-  //   } else if (mileage <= _currentTrip!.startMileage) {
-  //     debugPrint("Mileage didn't increase");
-  //     return;
-  //   } else {
-  //     _currentTrip!.currentMileage = mileage;
-  //     debugPrint("Mileage updated");
-  //   }
-  // }
 
   void endTrip(TripLocation? endLocation, int mileage) {
     if (_currentTrip == null) {

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:elogbook/notification_configuration.dart';
-import 'package:elogbook/views/home_screen.dart';
+import 'package:driver_logbook/notification_configuration.dart';
+import 'package:driver_logbook/views/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -50,7 +50,7 @@ class MyApp extends StatelessWidget with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Elogbook',
+      title: 'Driver Logbook',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),

@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.elogbook">
+    package="com.example.driver_logbook">
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -28,7 +28,7 @@
 
     <application
         android:name="${applicationName}"
-        android:label="elogbook"
+        android:label="driver_logbook"
         android:icon="@mipmap/ic_launcher">
 
         <activity

@@ -9,9 +9,9 @@ enum ServiceType { log, trip, driver }
 
 class HttpService {
   static final HttpService _singleton = HttpService._internal();
-  static final String? log = dotenv.env['log'];
-  static final String? trip = dotenv.env['trip'];
-  static final String? driver = dotenv.env['driver'];
+  static final String log = dotenv.get('LOG');
+  static final String trip = dotenv.get('TRIP');
+  static final String driver = dotenv.get('DRIVER');
   static final _postHeaders = {
     'Content-Type': 'application/json; charset=UTF-8'
   };
@@ -27,20 +27,16 @@ class HttpService {
 
   Future<http.Response> post(
       {required ServiceType type, Map<String, String>? body}) async {
-    if (log == null || trip == null || driver == null) {
-      debugPrint('Error: No URL found');
-      return http.Response('Error: URL not found', 404);
-    }
     String url = '';
     switch (type) {
       case ServiceType.log:
-        url = log!;
+        url = log;
         break;
       case ServiceType.trip:
-        url = trip!;
+        url = trip;
         break;
       case ServiceType.driver:
-        url = driver!;
+        url = driver;
         break;
     }
     try {

@@ -1,23 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:elogbook/controllers/trip_controller.dart';
-import 'package:elogbook/models/trip.dart';
-import 'package:elogbook/models/trip_location.dart';
-import 'package:elogbook/models/trip_status.dart';
-import 'package:elogbook/objectbox.dart';
-import 'package:elogbook/objectbox.g.dart';
-import 'package:elogbook/services/gps_service.dart';
-import 'package:elogbook/utils/extra.dart';
-import 'package:elogbook/utils/vehicle_utils.dart';
+import 'package:driver_logbook/controllers/trip_controller.dart';
+import 'package:driver_logbook/models/trip.dart';
+import 'package:driver_logbook/models/trip_location.dart';
+import 'package:driver_logbook/models/trip_status.dart';
+import 'package:driver_logbook/objectbox.dart';
+import 'package:driver_logbook/objectbox.g.dart';
+import 'package:driver_logbook/services/gps_service.dart';
+import 'package:driver_logbook/utils/extra.dart';
+import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:elogbook/services/http_service.dart';
-import 'package:elogbook/utils/help.dart';
+import 'package:driver_logbook/services/http_service.dart';
+import 'package:driver_logbook/utils/help.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // maybe write a separate task handler for ios
 // if it is even possible to run a task like that on ios
@@ -46,11 +47,13 @@ class BluetoothTaskHandler extends TaskHandler {
   List<String> knownRemoteIds = [];
   Timer? _disconnectTimer;
   DateTime _lastMileageResponseTime = DateTime.now();
+  DateTime _lastScanResultTime = DateTime.now();
   int? tripCategoryIndex;
   int? currentRssi;
   bool isDriverNotificatedAboutRegistering = false;
   bool isDriverNotificatedAboutInvalidData = false;
   Trip? tripToSend;
+  StreamSubscription<List<ScanResult>>? _scanResultsSubscription;
 
   // misc
   GpsService? _gpsService;
@@ -100,6 +103,28 @@ class BluetoothTaskHandler extends TaskHandler {
         }
       }
     });
+    _scanResultsSubscription ??=
+        FlutterBluePlus.onScanResults.listen((results) {
+      _lastScanResultTime = DateTime.now();
+      debugPrint("Scan results: $results");
+      if (results.isNotEmpty) {
+        for (var result in results) {
+          if (knownRemoteIds.contains(result.device.remoteId.str)) {
+            debugPrint(
+                "Remote id already known: ${result.device.remoteId.str}");
+            continue;
+          } else {
+            debugPrint("New remote id added: ${result.device.remoteId.str}");
+            knownRemoteIds.add(result.device.remoteId.str);
+          }
+        }
+        _prefs.setStringList("knownRemoteIds", knownRemoteIds);
+        if (knownRemoteIds.isEmpty) {
+          debugPrint('[BluetoothTaskHandler] No known remote ids');
+        }
+        _fetchDevicesAndConnectToOnlyOne();
+      }
+    });
   }
 
   @override
@@ -136,6 +161,15 @@ class BluetoothTaskHandler extends TaskHandler {
     }
     if (_connectionState == BluetoothConnectionState.disconnected ||
         await _connectedDevice!.isDisconnecting.first == true) {
+      final difference =
+          DateTime.now().difference(_lastScanResultTime).inSeconds;
+      if (difference >= 10) {
+        debugPrint("No scan results for 100 seconds..Scanning again");
+        _scanPeriodicallyForDevices();
+        // await HttpService().post(
+        //     type: ServiceType.log,
+        //     body: {"status": "No scan results for 100 seconds"});
+      }
       // await HttpService().post(type: ServiceType.log, body: {
       //   "status": "device disconnected, returning from onRepeatEvent"
       // });
@@ -240,14 +274,16 @@ class BluetoothTaskHandler extends TaskHandler {
   /// Called when the notification button is pressed.
   @override
   void onNotificationButtonPressed(String id) {
-    debugPrint('[BluetoothTaskHandler] onNotificationButtonPressed: $id');
+    return;
+    // debugPrint('[BluetoothTaskHandler] onNotificationButtonPressed: $id');
     // Handle any notification button actions here.
   }
 
   /// Called when the notification itself is pressed.
   @override
   void onNotificationPressed() {
-    debugPrint('[BluetoothTaskHandler] onNotificationPressed');
+    return;
+    // debugPrint('[BluetoothTaskHandler] onNotificationPressed');
   }
 
   /// Called when the notification itself is dismissed.
@@ -376,6 +412,9 @@ class BluetoothTaskHandler extends TaskHandler {
   Future<void> _initializeData() async {
     debugPrint('[BluetoothTaskHandler] Initializing data...');
     _prefs = await SharedPreferences.getInstance();
+    debugPrint('[BluetoothTaskHandler] Initialized SharedPreferences');
+    await dotenv.load(fileName: ".env");
+    debugPrint('[BluetoothTaskHandler] Initialized dotenv');
     try {
       await ObjectBox.create();
       _store = ObjectBox.store;
@@ -398,7 +437,24 @@ class BluetoothTaskHandler extends TaskHandler {
     //FlutterForegroundTask.sendDataToMain({'status': 'initialized'});
   }
 
+  // this method is called every minute if and only if the connection state is disconnected
+  Future<void> _scanPeriodicallyForDevices() async {
+    if (_connectionState == BluetoothConnectionState.connected) {
+      return;
+    }
+    try {
+      await FlutterBluePlus.startScan(
+          withServices: [Guid(dotenv.get('TARGET_SERVICE', fallback: ''))],
+          withNames: [dotenv.get("TARGET_ADV_NAME", fallback: "")],
+          timeout: const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint("Error scanning for devices: $e");
+      return;
+    }
+  }
+
   Future<void> _fetchDevicesAndConnectToOnlyOne() async {
+    _prefs.reload();
     debugPrint('[BluetoothTaskHandler] Fetching devices and connecting...');
     debugPrint("knownRemoteIds: $knownRemoteIds");
     if (knownRemoteIds.isEmpty) {
@@ -418,11 +474,6 @@ class BluetoothTaskHandler extends TaskHandler {
             '[BluetoothTaskHandler] Cant fetch, Already connected to a device: ${_connectedDevice?.remoteId.str}');
         return;
       }
-      // skip already fetched devices
-      // if (_knownDevices.any((device) => device.remoteId.str == id)) {
-      //   continue;
-      // }
-
       try {
         final device = BluetoothDevice.fromId(id);
         await device.connectAndUpdateStream();

@@ -1,13 +1,10 @@
-name: elogbook
-description: "A new Flutter project."
+name: driver_logbook
+description: "Ein elektronisches Fahrtenbuch für NovaCorp"
 publish_to: "none"
 version: 0.1.0
 
 environment:
   sdk: ">=3.3.4 <4.0.0"
-
-assets:
-  - .env
 
 dependencies:
   flutter:
@@ -43,3 +40,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env

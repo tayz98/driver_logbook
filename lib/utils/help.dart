@@ -1,4 +1,4 @@
-import 'package:elogbook/models/trip_category.dart';
+import 'package:driver_logbook/models/trip_category.dart';
 import 'package:intl/intl.dart';
 
 class Helper {

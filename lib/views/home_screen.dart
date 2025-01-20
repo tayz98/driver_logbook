@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'package:elogbook/models/globals.dart';
-import 'package:elogbook/models/trip_category.dart';
-import 'package:elogbook/objectbox.dart';
-import 'package:elogbook/views/settings_screen.dart';
-import 'package:elogbook/widgets/choose_trip_mode_buttons.dart';
+import 'package:driver_logbook/models/globals.dart';
+import 'package:driver_logbook/models/trip_category.dart';
+import 'package:driver_logbook/objectbox.dart';
+import 'package:driver_logbook/views/settings_screen.dart';
+import 'package:driver_logbook/widgets/choose_trip_mode_buttons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:elogbook/services/custom_bluetooth_service.dart';
+import 'package:driver_logbook/services/custom_bluetooth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Home extends StatefulWidget {
@@ -53,7 +53,7 @@ class HomeState extends State<Home> {
   @override
   void dispose() {
     FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
-    _customBluetoothService = null;
+    // _customBluetoothService = null;
     ObjectBox.store.close();
     _userDataStreamController.close();
     super.dispose();

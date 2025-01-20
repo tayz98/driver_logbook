@@ -1,4 +1,4 @@
-import 'package:elogbook/models/trip_status.dart';
+import 'package:driver_logbook/models/trip_status.dart';
 
 import '../models/trip.dart';
 import '../objectbox.g.dart';

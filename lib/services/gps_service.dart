@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:elogbook/models/trip_location.dart';
+import 'package:driver_logbook/models/trip_location.dart';
 
 class GpsService {
   get currentPosition async => await Geolocator.getCurrentPosition();

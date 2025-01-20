@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:elogbook/widgets/button_template.dart';
-import 'package:elogbook/models/globals.dart';
+import 'package:driver_logbook/widgets/button_template.dart';
+import 'package:driver_logbook/models/globals.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Settings extends StatefulWidget {
@@ -91,7 +91,7 @@ class SettingsState extends State<Settings> {
                     label: "Bluetooth-Geräte suchen",
                     onPressed: () async {
                       try {
-                        await widget.onScan();
+                        // await widget.onScan();
                         if (foundDeviceIds.isNotEmpty) {
                           if (context.mounted) {
                             _showScanResultsDialog(context, foundDeviceIds);

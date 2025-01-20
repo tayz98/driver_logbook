@@ -1,13 +1,14 @@
 import 'dart:io';
 
-import 'package:elogbook/bluetooth_task_handler.dart';
-import 'package:elogbook/notification_configuration.dart';
+import 'package:driver_logbook/bluetooth_task_handler.dart';
+import 'package:driver_logbook/notification_configuration.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // services
 // init the foreground service
+
 void initForegroundService() {
   FlutterForegroundTask.init(
     androidNotificationOptions: AndroidNotificationOptions(
@@ -16,13 +17,15 @@ void initForegroundService() {
         channelDescription:
             'Dieser Kanal wird für den Vordergrunddienst verwendet.',
         onlyAlertOnce: false,
-        playSound: true,
+        playSound: false,
+        enableVibration: true,
         showBadge: true,
+        visibility: NotificationVisibility.VISIBILITY_PUBLIC,
         priority: NotificationPriority.MAX,
         channelImportance: NotificationChannelImportance.MAX),
     iosNotificationOptions: const IOSNotificationOptions(
       showNotification: true,
-      playSound: true,
+      playSound: false,
     ),
     foregroundTaskOptions: ForegroundTaskOptions(
       eventAction: ForegroundTaskEventAction.repeat(4000),
@@ -49,6 +52,7 @@ Future<ServiceRequestResult?> startBluetoothService() async {
       notificationText:
           'Die Aufzeichnung von Fahrten kann jederzeit gestartet werden!',
       callback: startCallback,
+      notificationInitialRoute: '/doesnotexist',
     );
     return result;
   } catch (e) {
