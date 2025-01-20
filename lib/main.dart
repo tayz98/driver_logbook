@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final StreamController<NotificationResponse> selectNotificationStream =
     StreamController<NotificationResponse>.broadcast();
@@ -30,6 +31,7 @@ Future<void> main() async {
   if (isPrivateTripsAllowed == false) {
     exit(0);
   }
+  await dotenv.load(fileName: ".env");
 
   runApp(const MyApp());
 }

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 
-import 'secrets.dart' as secret;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -9,6 +9,9 @@ enum ServiceType { log, trip, driver }
 
 class HttpService {
   static final HttpService _singleton = HttpService._internal();
+  static final String? log = dotenv.env['log'];
+  static final String? trip = dotenv.env['trip'];
+  static final String? driver = dotenv.env['driver'];
   static final _postHeaders = {
     'Content-Type': 'application/json; charset=UTF-8'
   };
@@ -24,16 +27,20 @@ class HttpService {
 
   Future<http.Response> post(
       {required ServiceType type, Map<String, String>? body}) async {
+    if (log == null || trip == null || driver == null) {
+      debugPrint('Error: No URL found');
+      return http.Response('Error: URL not found', 404);
+    }
     String url = '';
     switch (type) {
       case ServiceType.log:
-        url = secret.log;
+        url = log!;
         break;
       case ServiceType.trip:
-        url = secret.trip;
+        url = trip!;
         break;
       case ServiceType.driver:
-        url = secret.driver;
+        url = driver!;
         break;
     }
     try {

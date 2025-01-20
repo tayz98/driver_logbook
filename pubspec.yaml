@@ -6,10 +6,14 @@ version: 0.1.0
 environment:
   sdk: ">=3.3.4 <4.0.0"
 
+assets:
+  - .env
+
 dependencies:
   flutter:
     sdk: flutter
   flutter_blue_plus: ^1.34.5
+  flutter_dotenv: ^5.2.1
   flutter_foreground_task: ^8.17.0
   flutter_local_notifications: ^18.0.1
   flutter_riverpod: ^2.6.1
