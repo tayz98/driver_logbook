@@ -1,6 +1,4 @@
 import 'dart:convert';
-
-import 'package:elogbook/models/driver.dart';
 import 'package:objectbox/objectbox.dart';
 import 'trip_location.dart';
 import './trip_category.dart';
@@ -14,7 +12,6 @@ class Trip {
   // TripLocation? endLocation;
   String startLocationJson;
   String? endLocationJson;
-  final ToOne<Driver> driver;
 
   final int startMileage;
   final String vin;
@@ -26,7 +23,6 @@ class Trip {
 
   Trip({
     required this.startMileage,
-    required this.driver,
     required this.vin,
     required this.tripCategory,
     required this.tripStatus,
@@ -72,8 +68,6 @@ class Trip {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'driverId': driver.target?.uid,
-      'driverName': driver.target?.lastName,
       'startMileage': startMileage,
       'endMileage': endMileage,
       'vin': vin,
@@ -91,8 +85,6 @@ class Trip {
     return '''
 Trip {
   id: $id,
-  driverId: ${driver.target?.uid},
-  driverName: ${driver.target?.lastName},
   startMileage: $startMileage,
   endMileage: $endMileage,
   vin: $vin,
