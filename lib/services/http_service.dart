@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,8 +13,12 @@ class HttpService {
   static final String log = dotenv.get('LOG', fallback: '');
   static final String trip = dotenv.get('TRIP', fallback: '');
   static final String driver = dotenv.get('DRIVER', fallback: '');
+  static final String apiKey = dotenv.get('API_KEY', fallback: '');
   static final _postHeaders = {
-    'Content-Type': 'application/json; charset=UTF-8'
+    'Content-Type': 'application/json; charset=UTF-8',
+    'Accept': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'x-api-key': apiKey
   };
 
   factory HttpService() {
@@ -40,8 +45,15 @@ class HttpService {
         break;
     }
     try {
-      return await http.post(Uri.parse(url),
+      final response = await http.post(Uri.parse(url),
           headers: _postHeaders, body: jsonEncode(body));
+      if (response.statusCode == 201) {
+        debugPrint(response.body);
+        return response;
+      } else {
+        return http.Response(
+            'Error: ${response.statusCode}', response.statusCode);
+      }
     } catch (e) {
       debugPrint('Error: $e');
       return http.Response('Error: $e', 500);
