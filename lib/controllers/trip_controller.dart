@@ -42,7 +42,9 @@ class TripController {
         'tripCategory2', TripCategory.values.indexOf(newCategory));
   }
 
-  void endTrip(TripLocation? endLocation, int mileage) {
+  // status = finished -> trip ended successfully
+  // status = cancelled -> bluetooth connection lost
+  void endTrip(TripLocation? endLocation, int mileage, TripStatus status) {
     if (_currentTrip == null) {
       debugPrint("Trip not found");
       throw Exception('Trip not found');
@@ -58,27 +60,7 @@ class TripController {
     }
     _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
     _currentTrip!.endMileage = mileage;
-    _currentTrip!.tripStatus = TripStatus.finished.toString();
-    _tripRepository.saveTrip(_currentTrip!);
-    _currentTrip = null;
-  }
-
-  // a use case could be to cancel a trip if the background task got destroyed.
-  void cancelTrip(TripLocation? endLocation, int? mileage) {
-    if (_currentTrip == null) {
-      debugPrint("Trip not found");
-      throw Exception('Trip not found');
-    }
-    if (endLocation == null) {
-      debugPrint("End location not found");
-      _currentTrip!.endLocationJson = jsonEncode(TripLocation(
-          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt"));
-    } else {
-      _currentTrip!.endLocationJson = jsonEncode(endLocation.toJson());
-    }
-    _currentTrip!.tripStatus = TripStatus.cancelled.toString();
-    _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
-    if (mileage != null) _currentTrip!.endMileage = mileage;
+    _currentTrip!.tripStatus = status.toString();
     _tripRepository.saveTrip(_currentTrip!);
     _currentTrip = null;
   }

@@ -151,13 +151,7 @@ class BluetoothTaskHandler extends TaskHandler {
     //   debugPrint("Error in onRepeatEvent: $e");
     // }
     if (_connectionState == BluetoothConnectionState.connected) {
-      final int tempRssi = await _connectedDevice?.readRssi() ?? 0;
-      if (tempRssi < _disconnectRssiThreshold) {
-        await HttpService().post(
-            type: ServiceType.log,
-            body: {"status": "rssi too low, returning from onRepeatEvent"});
-        return;
-      }
+      await _connectedDevice?.readRssi() ?? 0;
     }
     if (_connectionState == BluetoothConnectionState.disconnected ||
         await _connectedDevice!.isDisconnecting.first == true) {
@@ -304,10 +298,11 @@ class BluetoothTaskHandler extends TaskHandler {
       await _connectedDevice?.disconnectAndUpdateStream();
     }
     // if any trip was in progress, cancel it
-    if (Platform.isAndroid && _tripController?.currentTrip != null) {
-      debugPrint("Cancelling trip on destroy");
-      _tripController!.cancelTrip(_tempLocation, _vehicleMileage);
-    }
+    // if (Platform.isAndroid && _tripController?.currentTrip != null) {
+    //   debugPrint("Cancelling trip on destroy");
+    //   _tripController!
+    //       .endTrip(_tempLocation, _vehicleMileage!, TripStatus.cancelled);
+    // }
     // on ios: maybe pause and resume, because tasks could be destroyed more often
     _store.close();
     _tripController = null;
@@ -345,14 +340,14 @@ class BluetoothTaskHandler extends TaskHandler {
       if (event.device.remoteId == _connectedDevice?.remoteId) {
         currentRssi = event.rssi;
 
-        // If we are below -85 for 5+ seconds, we disconnect
+        // If rssi is below -85 for 10+ seconds, disconnect
         if (currentRssi! < _disconnectRssiThreshold) {
-          _disconnectTimer ??= Timer(const Duration(seconds: 5), () {
+          _disconnectTimer ??= Timer(const Duration(seconds: 10), () {
             _disconnectTimer = null;
             _connectedDevice?.disconnectAndUpdateStream();
           });
         }
-        // If we climb back above -75, we cancel the pending disconnect
+        // If rssi climbs back above -75, cancel the pending disconnect
         else if (currentRssi! > _goodRssiThreshold) {
           if (_disconnectTimer != null) {
             _disconnectTimer?.cancel();
@@ -373,7 +368,7 @@ class BluetoothTaskHandler extends TaskHandler {
         await _connectedDevice?.isDisconnecting.first == true) {
       return;
     }
-    final Guid targetService = Guid("0000fff0-0000-1000-8000-00805f9b34fb");
+    final Guid targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
     List<BluetoothService> services =
         await _connectedDevice!.discoverServices();
     for (BluetoothService service in services) {
@@ -504,6 +499,11 @@ class BluetoothTaskHandler extends TaskHandler {
           await _discoverCharacteristics(device);
         }
       } else if (state == BluetoothConnectionState.disconnected) {
+        if (_tripController?.currentTrip != null) {
+          debugPrint("Cancelling trip on bluetooth disconnection");
+          _tripController!
+              .endTrip(_tempLocation, _vehicleMileage!, TripStatus.cancelled);
+        }
         debugPrint(
             '[BluetoothTaskHandler] Device disconnected: ${device.remoteId.str}');
         _connectedDevice = null;
@@ -706,7 +706,8 @@ class BluetoothTaskHandler extends TaskHandler {
           street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
     }
     _gpsService = null;
-    _tripController!.endTrip(_tempLocation, _vehicleMileage!);
+    _tripController!
+        .endTrip(_tempLocation, _vehicleMileage!, TripStatus.finished);
     _isElm327Initialized = false;
     _vehicleVin = null;
     _vehicleMileage = null;
