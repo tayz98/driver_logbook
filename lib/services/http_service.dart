@@ -9,9 +9,9 @@ enum ServiceType { log, trip, driver }
 
 class HttpService {
   static final HttpService _singleton = HttpService._internal();
-  static final String log = dotenv.get('LOG');
-  static final String trip = dotenv.get('TRIP');
-  static final String driver = dotenv.get('DRIVER');
+  static final String log = dotenv.get('LOG', fallback: '');
+  static final String trip = dotenv.get('TRIP', fallback: '');
+  static final String driver = dotenv.get('DRIVER', fallback: '');
   static final _postHeaders = {
     'Content-Type': 'application/json; charset=UTF-8'
   };

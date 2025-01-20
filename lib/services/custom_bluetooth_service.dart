@@ -12,8 +12,10 @@ class CustomBluetoothService {
   // Bluetooth
 
   List<ScanResult> _scanResults = [];
-  final Guid _targetService = Guid(dotenv.get('targetService'));
-  final String _targetAdvName = dotenv.get('targetAdvName');
+  final Guid _targetService =
+      Guid(dotenv.get('TARGET_SERVICE', fallback: 'Unknown'));
+  final String _targetAdvName =
+      dotenv.get('TARGET_ADV_NAME', fallback: 'Unknown');
 
   CustomBluetoothService() {
     _initialize();
