@@ -34,13 +34,16 @@ extension Extra on BluetoothDevice {
     _cstream.add(true);
     try {
       await connect(autoConnect: true, mtu: null);
+      await connectionState
+          .where((state) => state == BluetoothConnectionState.connected)
+          .first;
     } finally {
       _cstream.add(false);
     }
   }
 
   // disconnect & update stream
-  Future<void> disconnectAndUpdateStream({bool queue = true}) async {
+  Future<void> disconnectAndUpdateStream({bool queue = false}) async {
     _dstream.add(true);
     try {
       await disconnect(queue: queue);

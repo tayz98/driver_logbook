@@ -1,44 +1,36 @@
-import 'package:elogbook/models/driver.dart';
+import 'dart:convert';
 import 'package:objectbox/objectbox.dart';
 import 'trip_location.dart';
 import './trip_category.dart';
 import './trip_status.dart';
-import 'package:uuid/uuid.dart';
 
 @Entity()
 class Trip {
   @Id()
   int id = 0;
-
-  final ToOne<TripLocation> startLocation;
-  final ToOne<TripLocation> endLocation;
-  final ToOne<Driver> driver;
+  // final TripLocation startLocation;
+  // TripLocation? endLocation;
+  String startLocationJson;
+  String? endLocationJson;
 
   final int startMileage;
-  final int? endMileage;
-  final int? currentMileage;
   final String vin;
   final String startTimestamp;
-  final String tripCategory;
-  final String? endTimestamp;
-  final String tripStatus;
-  @Index()
-  @Unique()
-  final String tripId;
+  String? endTimestamp;
+  int? endMileage;
+  String tripCategory;
+  String tripStatus;
 
-  Trip(
-      {required this.startLocation,
-      required this.endLocation,
-      required this.startMileage,
-      required this.driver,
-      required this.vin,
-      required this.startTimestamp,
-      required this.endTimestamp,
-      required this.endMileage,
-      required this.currentMileage,
-      required this.tripStatus,
-      required this.tripCategory})
-      : tripId = const Uuid().v4();
+  Trip({
+    required this.startMileage,
+    required this.vin,
+    required this.tripCategory,
+    required this.tripStatus,
+    required this.startLocationJson,
+    this.endLocationJson,
+    this.endMileage,
+    this.endTimestamp,
+  }) : startTimestamp = DateTime.now().toIso8601String();
 
   TripCategory get tripCategoryEnum {
     return TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
@@ -47,53 +39,63 @@ class Trip {
   TripStatus get tripStatusEnum =>
       TripStatus.values.firstWhere((e) => e.toString() == tripStatus);
 
+  // Getter/Setter for startLocation
+  TripLocation get startLocation {
+    if (startLocationJson.isEmpty) {
+      throw const FormatException("startLocationJson is empty");
+    }
+    return TripLocation.fromJson(jsonDecode(startLocationJson));
+  }
+
+  set startLocation(TripLocation location) =>
+      startLocationJson = jsonEncode(location.toJson());
+
+  // Getter/Setter for endLocation
+  TripLocation? get endLocation => endLocationJson != null
+      ? TripLocation.fromJson(jsonDecode(endLocationJson!))
+      : null;
+  set endLocation(TripLocation? location) =>
+      endLocationJson = location != null ? jsonEncode(location.toJson()) : null;
+
+  String getCategoryShortForm(String category) {
+    return category.split('.').last;
+  }
+
+  String getStatusShortForm(String status) {
+    return status.split('.').last;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'startMileage': startMileage,
+      'endMileage': endMileage,
+      'vin': vin,
+      'startTimestamp': startTimestamp,
+      'endTimestamp': endTimestamp,
+      'endDate': endTimestamp,
+      'tripCategory': getCategoryShortForm(tripCategory),
+      'tripStatus': getStatusShortForm(tripStatus),
+      'startLocation': startLocation.toJson(),
+      'endLocation': endLocation?.toJson(),
+    };
+  }
+
   @override
   String toString() {
     return '''
 Trip {
   id: $id,
-  tripId: $tripId,
-  driverId: ${driver.target?.uid},
-  driverName: ${driver.target?.surname},
   startMileage: $startMileage,
-  currentMileage: $currentMileage,
   endMileage: $endMileage,
   vin: $vin,
   startTimestamp: $startTimestamp,
   endTimestamp: $endTimestamp,
   tripCategory: $tripCategory,
   tripStatus: $tripStatus,
-  startLocation: ${startLocation.target},
-  endLocation: ${endLocation.target}
+  startLocation: ${startLocation.toString()},
+  endLocation: ${endLocation.toString()},
 }
 ''';
-  }
-
-  Trip copyWith({
-    int? startMileage,
-    int? currentMileage,
-    int? endMileage,
-    String? vin,
-    String? startTimestamp,
-    String? endTimestamp,
-    String? tripCategory,
-    String? tripStatus,
-    // ToOne<TripLocation>? startLocation,
-    // ToOne<TripLocation>? endLocation,
-    // ToOne<Driver>? driver,
-  }) {
-    return Trip(
-      startMileage: startMileage ?? this.startMileage,
-      currentMileage: currentMileage ?? this.currentMileage,
-      endMileage: endMileage ?? this.endMileage,
-      vin: vin ?? this.vin,
-      startTimestamp: startTimestamp ?? this.startTimestamp,
-      tripCategory: tripCategory ?? this.tripCategory,
-      tripStatus: tripStatus ?? this.tripStatus,
-      startLocation: startLocation,
-      endLocation: endLocation,
-      endTimestamp: endTimestamp ?? this.endTimestamp,
-      driver: driver,
-    );
   }
 }

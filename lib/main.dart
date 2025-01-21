@@ -1,16 +1,15 @@
 import 'dart:async';
-import 'package:elogbook/notification_configuration.dart';
-import 'package:elogbook/objectbox.dart';
-import 'package:elogbook/providers/providers.dart';
-import 'package:elogbook/services/log_service.dart';
-import 'package:elogbook/views/home_screen.dart';
+import 'dart:io';
+import 'package:driver_logbook/notification_configuration.dart';
+import 'package:driver_logbook/views/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final StreamController<NotificationResponse> selectNotificationStream =
     StreamController<NotificationResponse>.broadcast();
@@ -20,22 +19,21 @@ const MethodChannel platform =
 
 const String portName = 'notification_send_port';
 
-late ObjectBox objectbox;
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterForegroundTask.initCommunicationPort();
   await initializeDateFormatting('de_DE');
   Intl.defaultLocale = 'de_DE';
-  objectbox = await ObjectBox.create();
-  await LogService.initializeLogFile();
   await initializeNotifications();
+  final prefs = await SharedPreferences.getInstance();
+  final isPrivateTripsAllowed = prefs.getBool('privateTripsAllowed');
 
-  // requestNotificationPermission();
+  if (isPrivateTripsAllowed == false) {
+    exit(0);
+  }
+  await dotenv.load(fileName: ".env");
 
-  FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
-  runApp(ProviderScope(overrides: [
-    storeProvider.overrideWithValue(objectbox.store),
-  ], child: const MyApp()));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget with WidgetsBindingObserver {
@@ -52,7 +50,7 @@ class MyApp extends StatelessWidget with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Elogbook',
+      title: 'Driver Logbook',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),

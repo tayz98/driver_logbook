@@ -1,18 +1,18 @@
-import 'package:elogbook/models/trip_category.dart';
+import 'package:driver_logbook/models/trip_category.dart';
 import 'package:intl/intl.dart';
 
 class Helper {
   static String formatDateString(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
-      return 'Ungültiges Datum';
+      return raw ?? '';
     }
 
     DateTime? parsed = _normalizeAndParseDateTime(raw);
     if (parsed == null) {
-      return 'Ungültiges Datum';
+      return raw;
     }
 
-    return DateFormat('dd.MM.yyyy HH:mm').format(parsed);
+    return DateFormat('dd.MM.yyyy HH:mm:ss').format(parsed);
   }
 
   static DateTime? _normalizeAndParseDateTime(String raw) {
@@ -47,7 +47,7 @@ class Helper {
       case TripCategory.private:
         return "Privat";
       case TripCategory.business:
-        return "Geschäftlich";
+        return "Dienst";
       case TripCategory.commute:
         return "Arbeitsweg";
     }
