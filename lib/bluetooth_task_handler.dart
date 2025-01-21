@@ -7,6 +7,7 @@ import 'package:driver_logbook/models/trip_location.dart';
 import 'package:driver_logbook/models/trip_status.dart';
 import 'package:driver_logbook/objectbox.dart';
 import 'package:driver_logbook/objectbox.g.dart';
+import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:driver_logbook/services/gps_service.dart';
 import 'package:driver_logbook/utils/extra.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
@@ -42,8 +43,8 @@ class BluetoothTaskHandler extends TaskHandler {
       BluetoothConnectionState.disconnected;
   StreamSubscription<BluetoothConnectionState>? _deviceStateSubscription;
   StreamSubscription<OnReadRssiEvent>? _rssiStreamSubscription;
-  final int _disconnectRssiThreshold = -85;
-  final int _goodRssiThreshold = -75;
+  final int _disconnectRssiThreshold = -65;
+  final int _goodRssiThreshold = -55;
   List<String> knownRemoteIds = [];
   Timer? _disconnectTimer;
   DateTime _lastMileageResponseTime = DateTime.now();
@@ -86,42 +87,40 @@ class BluetoothTaskHandler extends TaskHandler {
 
     // listen for mileage response and update the last response time
     _mileageResponseController.stream.listen((_) async {
+      // keep track of latest mileage response time
       _lastMileageResponseTime = DateTime.now();
       if (_vehicleVin != null && _vehicleMileage != null) {
+        // if all vehicle data were received, check if they are correct.
         if (!_isDataValid) {
-          debugPrint("executing checkData");
-          await HttpService().post(
-              type: ServiceType.log, body: {"status": "executing checkData"});
           _checkData();
         }
       } else {
+        // mileage is known by this point, but not vin, so we send the vin request here.
         debugPrint("sending vin request");
-        if (_connectionState == BluetoothConnectionState.connected &&
-                _connectedDevice != null ||
-            await _connectedDevice!.isDisconnecting.first == false) {
-          await _sendCommand(vinCommand);
-        }
+        await _sendCommand(vinCommand);
       }
     });
+    // use a subscription to update the scan results and save them
     _scanResultsSubscription ??=
         FlutterBluePlus.onScanResults.listen((results) {
-      _lastScanResultTime = DateTime.now();
+      _lastScanResultTime = DateTime
+          .now(); // remember resulsts time, to initiate a new scan after 100 sec
       debugPrint("Scan results: $results");
       if (results.isNotEmpty) {
         for (var result in results) {
           if (knownRemoteIds.contains(result.device.remoteId.str)) {
+            // skip device that were already scanned
             debugPrint(
                 "Remote id already known: ${result.device.remoteId.str}");
             continue;
           } else {
             debugPrint("New remote id added: ${result.device.remoteId.str}");
             knownRemoteIds.add(result.device.remoteId.str);
+            // overwrite shared preference with the new list
+            _prefs.setStringList("knownRemoteIds", knownRemoteIds);
           }
         }
-        _prefs.setStringList("knownRemoteIds", knownRemoteIds);
-        if (knownRemoteIds.isEmpty) {
-          debugPrint('[BluetoothTaskHandler] No known remote ids');
-        }
+        // fetch scanned device(s) to initiate new connections
         _fetchDevicesAndConnectToOnlyOne();
       }
     });
@@ -129,62 +128,54 @@ class BluetoothTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    // tripToSend = _store.box<Trip>().get(3);
-    // debugPrint(jsonEncode(tripToSend?.toJson()));
-    // debugPrint("Sending Trip: $tripToSend");
-    // await HttpService().post(
-    //     type: ServiceType.trip,
-    //     body: tripToSend!
-    //         .toJson()
-    //         .map((key, value) => MapEntry(key, value.toString())));
-    //debugPrint(ObjectBox.store.box<Trip>().getAll().toString());
-    // try {
-    //   await HttpService().post(type: ServiceType.log, body: {
-    //     "status": "onRepeatEvent",
-    //     "connectionState": _connectionState.toString(),
-    //     "timestamp": Helper.formatDateString(DateTime.now().toString()),
-    //     "trip_status":
-    //         _tripController?.currentTrip?.tripStatusEnum.toString() ??
-    //             "unknown",
-    //   });
-    // } catch (e) {
-    //   debugPrint("Error in onRepeatEvent: $e");
-    // }
+    // wait for data initialize to complete before accessing any data that wasn't initialize
+    await _initializationCompleter.future;
+
+    // DEBUGGING: check for trip in database
+    for (final trip in TripRepository.getAllTrips()) {
+      debugPrint("found trip: ${trip.id}");
+    }
+    // try to send finished or cancelled
+    for (final trip in TripRepository.getFinishedAndCancelledTrips()) {
+      debugPrint("found finished trip: ${trip.id}");
+      debugPrint(jsonEncode(trip.toJson()));
+      final response =
+          await HttpService().post(type: ServiceType.trip, body: trip.toJson());
+      if (response.statusCode == 201) {
+        debugPrint("Successfully transmitted trip");
+        _store.box<Trip>().remove(trip.id);
+      } else {
+        debugPrint(
+            "Failed to transmit trip, status code: ${response.statusCode}");
+      }
+    }
+
     if (_connectionState == BluetoothConnectionState.connected) {
-      await _connectedDevice?.readRssi() ?? 0;
+      await _connectedDevice?.readRssi();
+      // read constantly rssi of connected device to trigger rssi stream
     }
     if (_connectionState == BluetoothConnectionState.disconnected ||
         await _connectedDevice!.isDisconnecting.first == true) {
+      // if no device is connected, check last scan result time and scan again the interval is over
       final difference =
           DateTime.now().difference(_lastScanResultTime).inSeconds;
       if (difference >= 10) {
         debugPrint("No scan results for 100 seconds..Scanning again");
         _scanPeriodicallyForDevices();
-        // await HttpService().post(
-        //     type: ServiceType.log,
-        //     body: {"status": "No scan results for 100 seconds"});
       }
-      // await HttpService().post(type: ServiceType.log, body: {
-      //   "status": "device disconnected, returning from onRepeatEvent"
-      // });
+      // if no device is connected, nothing more to do here -> return
       return;
     }
-    await _initializationCompleter.future;
     try {
-      // wait for initialization to complete before proceeding
-      //debugPrint(ObjectBox.store.box<Driver>().getAll().toString());
-
-      // debug
-      debugPrint('[BluetoothTaskHandler] onRepeatEvent: $timestamp');
       debugPrint('[BluetoothTaskHandler] Connection state: $_connectionState');
-
       debugPrint(
           '[BluetoothTaskHandler] Trip: ${_tripController?.currentTrip}');
-      debugPrint('Known remote ids: $knownRemoteIds');
 
+      // an initialized elm327 and a connected device are the basic requirements for everything what's to follow
       if (_isElm327Initialized &&
           _connectionState == BluetoothConnectionState.connected) {
-        // only start telemetry collection if the elm327 controller is initialized
+        // conditions to end a trip: trip in progress and no mileage response for 12 secs
+
         if (_tripController?.currentTrip != null &&
             _tripController?.currentTrip?.tripStatusEnum ==
                 TripStatus.inProgress) {
@@ -192,25 +183,24 @@ class BluetoothTaskHandler extends TaskHandler {
               DateTime.now().difference(_lastMileageResponseTime).inSeconds;
           if (difference >= 12) {
             debugPrint("No response from ELM327 for 12 seconds..Ending trip");
-            await HttpService().post(
-                type: ServiceType.log,
-                body: {"status": "No response from ELM327 for 12 seconds"});
             await _endTrip();
             return;
           }
         }
-        _tripController ??= TripController(ObjectBox.store, _prefs);
-        _gpsService ??= GpsService();
-        await _sendCommand(_skodaMileageCommand); // query mileage continuously
+        // send mileage request command continuously
+        await _sendCommand(_skodaMileageCommand);
+
+        // conditions to start a trip: data has not been checked, and no trip is running
         if (_isDataValid && _tripController?.currentTrip == null) {
-          await HttpService().post(
-              type: ServiceType.log,
-              body: {"status": "Data is valid, starting trip"});
+          // by this point the mileage controller has initiated a data check,
+          // if the check was successfull, then start the trip
           await _startTrip();
         }
-        // if the elm327 has not responded and therefore the initialization has been set to false
-        // but the device is still connected and the driver  plans to start a consecutive trip
-        // the initialization has to be done again, maybe add another boolean like hasTripEnded for more robustness
+
+        // this is needed when a consecutive trips needs to start
+        // for example: when a trip ends all these flags are set to null or false
+        // but when a driver doesn't step out of his car, which means the BLE connection still exists
+        // and he starts a consecutive trip, then it's necessary to check the elm327 continously
       } else if (!_isElm327Initialized &&
           _connectionState == BluetoothConnectionState.connected &&
           _writeCharacteristic != null &&
@@ -225,6 +215,7 @@ class BluetoothTaskHandler extends TaskHandler {
 
   @override
   void onReceiveData(Object data) async {
+    // the trip category and scan from the main app can be received here from the main app.
     debugPrint(
         '[BluetoothTaskHandler] onReceiveData: $data type: ${data.runtimeType}');
     // HttpService().post(type: ServiceType.log, body: {
@@ -234,8 +225,8 @@ class BluetoothTaskHandler extends TaskHandler {
     //   "timestamp": Helper.formatDateString(DateTime.now().toString())
     // });
 
-    // only the trip category index is received as int from the main app
     if (data is int) {
+      // if data is int, it means it is the index of the trip category
       tripCategoryIndex = data;
       if (tripCategoryIndex != null &&
           tripCategoryIndex! >= 0 &&
@@ -244,6 +235,7 @@ class BluetoothTaskHandler extends TaskHandler {
         _prefs.setInt('tripCategory2', tripCategoryIndex!);
       }
     } else if (data is List<dynamic>) {
+      // if data is a list, it means it is a list of scanned remote ids from devices
       debugPrint("Data is List<dynamic>");
       final newRemoteIds = data.cast<String>();
       for (var id in newRemoteIds) {
@@ -269,41 +261,28 @@ class BluetoothTaskHandler extends TaskHandler {
   @override
   void onNotificationButtonPressed(String id) {
     return;
-    // debugPrint('[BluetoothTaskHandler] onNotificationButtonPressed: $id');
-    // Handle any notification button actions here.
   }
 
   /// Called when the notification itself is pressed.
   @override
   void onNotificationPressed() {
     return;
-    // debugPrint('[BluetoothTaskHandler] onNotificationPressed');
   }
 
   /// Called when the notification itself is dismissed.
   @override
   void onNotificationDismissed() {
-    debugPrint('[BluetoothTaskHandler] onNotificationDismissed');
+    return;
   }
 
   /// Called when the task is destroyed.
   @override
   Future<void> onDestroy(DateTime timestamp) async {
-    await HttpService().post(type: ServiceType.log, body: {
-      "status": "onDestroy",
-      "timestamp": Helper.formatDateString(timestamp.toString())
-    });
+    // delete/disconnect everything here:
     if (_connectedDevice != null) {
       debugPrint("Disconnecting device on destroy");
       await _connectedDevice?.disconnectAndUpdateStream();
     }
-    // if any trip was in progress, cancel it
-    // if (Platform.isAndroid && _tripController?.currentTrip != null) {
-    //   debugPrint("Cancelling trip on destroy");
-    //   _tripController!
-    //       .endTrip(_tempLocation, _vehicleMileage!, TripStatus.cancelled);
-    // }
-    // on ios: maybe pause and resume, because tasks could be destroyed more often
     _store.close();
     _tripController = null;
     _mileageResponseController.close();
@@ -335,6 +314,8 @@ class BluetoothTaskHandler extends TaskHandler {
     //FlutterBluePlus.setLogLevel(LogLevel.verbose);
     _fetchDevicesAndConnectToOnlyOne();
 
+    // keep track of the rssi to disconnect a device
+    // best case is: a ble connection only establishes when the driver is in his car
     _rssiStreamSubscription ??=
         FlutterBluePlus.events.onReadRssi.listen((event) {
       if (event.device.remoteId == _connectedDevice?.remoteId) {
@@ -404,6 +385,7 @@ class BluetoothTaskHandler extends TaskHandler {
     }
   }
 
+  // create all neccessary data
   Future<void> _initializeData() async {
     debugPrint('[BluetoothTaskHandler] Initializing data...');
     _prefs = await SharedPreferences.getInstance();
@@ -419,14 +401,14 @@ class BluetoothTaskHandler extends TaskHandler {
           .post(type: ServiceType.log, body: {"status": "ObjectBox error: $e"});
     }
     debugPrint('[BluetoothTaskHandler] Initialized ObjectBox');
-    _tripController = TripController(ObjectBox.store, _prefs);
     debugPrint('[BluetoothTaskHandler] Initialized SharedPreferences');
     knownRemoteIds = _prefs.getStringList("knownRemoteIds") ?? [];
     debugPrint('[BluetoothTaskHandler] Initialized knownRemoteIds');
+    _tripController ??= TripController();
+    _gpsService ??= GpsService();
     _initializationCompleter.complete();
     debugPrint('[BluetoothTaskHandler] Initialized data');
-    await HttpService()
-        .post(type: ServiceType.log, body: {"status": "initialized Data"});
+
     // debugPrint(
     //     "initializiation: ${_objectBox.store.box<Trip>().getAll().toString()}");
     //FlutterForegroundTask.sendDataToMain({'status': 'initialized'});
@@ -463,8 +445,9 @@ class BluetoothTaskHandler extends TaskHandler {
       return;
     }
     for (var id in knownRemoteIds) {
+      // if a device is already connected, prevent connecting to new devices
       if (_connectionState == BluetoothConnectionState.connected) {
-        // needed for mid loop handling
+        // needed for mid loop handling to avoid race conditions
         debugPrint(
             '[BluetoothTaskHandler] Cant fetch, Already connected to a device: ${_connectedDevice?.remoteId.str}');
         return;
@@ -483,16 +466,13 @@ class BluetoothTaskHandler extends TaskHandler {
   }
 
   void _listenToDeviceState(BluetoothDevice device) {
+    // handle device
     _deviceStateSubscription?.cancel();
     _deviceStateSubscription ??= device.connectionState.listen((state) async {
       _connectionState = state;
       if (state == BluetoothConnectionState.connected) {
         debugPrint(
             '[BluetoothTaskHandler] Device connected: ${device.remoteId.str}');
-        HttpService().post(type: ServiceType.log, body: {
-          "status": "Device connected",
-          "remoteId": device.remoteId.str
-        });
         if (_connectedDevice != null) {
           _connectedDevice = device;
           await _requestMtu(device);
@@ -509,6 +489,7 @@ class BluetoothTaskHandler extends TaskHandler {
         _connectedDevice = null;
         _writeCharacteristic = null;
         _notifyCharacteristic = null;
+        // only connect to the same device after 15 seconds, to prevent connecting immediately again
         Future.delayed(const Duration(seconds: 15), () async {
           await _fetchDevicesAndConnectToOnlyOne();
         });
@@ -529,27 +510,31 @@ class BluetoothTaskHandler extends TaskHandler {
     List<String> initCommands = [
       "ATZ", // Reset ELM327
       "ATE0", // Echo Off
-      "ATL0", // Linefeeds Offr
+      "ATL0", // Linefeeds Off
       "ATS0", // Spaces Off
       "ATH1", // Headers On
       "ATSP0", // Set Protocol to Automatic
       "ATSH 7E0", // Set Header to 7E0
     ];
     for (String cmd in initCommands) {
-      await _sendCommand(cmd);
+      bool success = await _sendCommand(cmd);
+      if (!success) {
+        debugPrint("Failed to initialize, probably because of a disconnect");
+        return;
+      }
       await Future.delayed(const Duration(
           milliseconds: 2500)); // wait for every command to process
     }
+    // elm327 is only considered to be complete here.
     _isElm327Initialized = true;
-    await HttpService()
-        .post(type: ServiceType.log, body: {"status": "ELM327 initialized"});
+    debugPrint("elm327 initialized");
   }
 
   // send command to elm327
-  Future<void> _sendCommand(String command) async {
+  Future<bool> _sendCommand(String command) async {
     if (_connectionState == BluetoothConnectionState.disconnected ||
         await _connectedDevice?.isDisconnecting.first == true) {
-      return;
+      return false;
     }
     debugPrint("Sending command: $command");
     await HttpService().post(
@@ -558,8 +543,10 @@ class BluetoothTaskHandler extends TaskHandler {
     List<int> bytes = utf8.encode(fullCommand);
     try {
       await _writeCharacteristic?.write(bytes, withoutResponse: true);
+      return true;
     } catch (e) {
       debugPrint("Error in _sendCommand: $e");
+      return false;
     }
   }
 
@@ -615,27 +602,32 @@ class BluetoothTaskHandler extends TaskHandler {
     }
   }
 
+  final List<String> unwantedStrings = [
+    "]",
+    "[",
+    ">",
+    "<",
+    ":",
+    ".",
+    " ",
+    "\u00A0", // Non-breaking space
+    "SEARCHING",
+    "STOPPED",
+    "ELM327 v1.5",
+    "NODATA",
+    "TIMEOUT",
+    "CANERROR",
+    "OK",
+  ];
+
   // process the complete response from elm327
   void _processCompleteResponse(String response) {
     // remove all unnecessary characters or words
-    String cleanedResponse = response
-        .trim()
-        .replaceAll("]", "")
-        .replaceAll("[", "")
-        .replaceAll(">", "")
-        .replaceAll("<", "")
-        .replaceAll(":", "")
-        .replaceAll(".", "")
-        .replaceAll(" ", "")
-        .replaceAll("\u00A0", "")
-        .replaceAll(RegExp(r"\s+"), "")
-        .replaceAll("SEARCHING", "")
-        .replaceAll("STOPPED", "")
-        //.replaceAll("ELM327V15", "")
-        .replaceAll("NODATA", "")
-        .replaceAll("TIMEOUT", "")
-        .replaceAll("CANERROR", "")
-        .replaceAll("OK", "");
+    String cleanedResponse = response;
+    for (String str in unwantedStrings) {
+      cleanedResponse = cleanedResponse.replaceAll(str, "");
+    }
+    cleanedResponse = cleanedResponse.replaceAll(RegExp(r"\s+"), "").trim();
 
     if (cleanedResponse.isEmpty) return; // unsolicited response, ignore it
     // every mileage response starts with 6210
@@ -678,12 +670,6 @@ class BluetoothTaskHandler extends TaskHandler {
         debugPrint("Creating new trip...");
         _tripController!
             .startTrip(_vehicleMileage!, _vehicleVin!, _tempLocation);
-        HttpService().post(type: ServiceType.log, body: {
-          "status": "Trip started",
-          "vehicleMileage": _vehicleMileage.toString(),
-          "vehicleVin": _vehicleVin.toString(),
-          "tempLocation": _tempLocation.toString()
-        });
         updateNotificationText("Fahrtaufzeichnung", "Die Fahrt hat begonnen");
         debugPrint(_tripController?.currentTrip.toString());
       }
@@ -695,7 +681,6 @@ class BluetoothTaskHandler extends TaskHandler {
 
   Future<void> _endTrip() async {
     updateNotificationText("Fahrt beendet", "Die Fahrt wurde beendet");
-    HttpService().post(type: ServiceType.log, body: {"status": "Ending trip"});
     debugPrint("Ending telemetry collection...");
     try {
       final endPosition = await _gpsService!.currentPosition;

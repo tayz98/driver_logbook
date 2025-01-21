@@ -6,23 +6,22 @@ import 'package:driver_logbook/models/trip_location.dart';
 import 'package:driver_logbook/models/trip_status.dart';
 import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:flutter/material.dart';
-import 'package:objectbox/objectbox.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TripController {
   Trip? _currentTrip;
   Trip? get currentTrip => _currentTrip;
-  final Store _store;
-  late TripRepository _tripRepository;
-  final SharedPreferences _prefs;
 
-  TripController(this._store, this._prefs) {
-    _tripRepository = TripRepository(_store);
+  late SharedPreferences _prefs;
+
+  TripController() {
+    SharedPreferences.getInstance().then((prefs) {
+      _prefs = prefs;
+    });
   }
 
   void startTrip(int mileage, String vin, TripLocation startLocation) {
     _prefs.reload();
-
     _currentTrip = Trip(
       startMileage: mileage,
       vin: vin,
@@ -61,11 +60,7 @@ class TripController {
     _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
     _currentTrip!.endMileage = mileage;
     _currentTrip!.tripStatus = status.toString();
-    _tripRepository.saveTrip(_currentTrip!);
+    TripRepository.saveTrip(_currentTrip!);
     _currentTrip = null;
-  }
-
-  void changeStore(Store store) {
-    _tripRepository = TripRepository(store);
   }
 }

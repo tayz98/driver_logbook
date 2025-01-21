@@ -72,6 +72,7 @@ class Trip {
       'endMileage': endMileage,
       'vin': vin,
       'startTimestamp': startTimestamp,
+      'endTimestamp': endTimestamp,
       'endDate': endTimestamp,
       'tripCategory': getCategoryShortForm(tripCategory),
       'tripStatus': getStatusShortForm(tripStatus),

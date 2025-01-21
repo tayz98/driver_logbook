@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -31,7 +30,7 @@ class HttpService {
   }
 
   Future<http.Response> post(
-      {required ServiceType type, Map<String, String>? body}) async {
+      {required ServiceType type, Map<String, dynamic>? body}) async {
     String url = '';
     switch (type) {
       case ServiceType.log:
@@ -45,15 +44,11 @@ class HttpService {
         break;
     }
     try {
-      final response = await http.post(Uri.parse(url),
-          headers: _postHeaders, body: jsonEncode(body));
-      if (response.statusCode == 201) {
-        debugPrint(response.body);
-        return response;
-      } else {
-        return http.Response(
-            'Error: ${response.statusCode}', response.statusCode);
+      if (url.isEmpty) {
+        throw Exception('URL is empty');
       }
+      return await http.post(Uri.parse(url),
+          headers: _postHeaders, body: jsonEncode(body));
     } catch (e) {
       debugPrint('Error: $e');
       return http.Response('Error: $e', 500);
