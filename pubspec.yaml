@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_background_service: ^5.1.0
   flutter_blue_plus: ^1.34.5
   flutter_dotenv: ^5.2.1
   flutter_foreground_task: ^8.17.0
