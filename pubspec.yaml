@@ -18,6 +18,7 @@ dependencies:
   geolocator: ^13.0.2
   http: ^1.2.2
   intl: ^0.20.1
+  logger: ^2.5.0
   objectbox: ^4.0.3
   objectbox_flutter_libs: any
   path: ^1.9.0
