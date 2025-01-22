@@ -4,6 +4,7 @@ import 'package:driver_logbook/models/trip.dart';
 import 'package:driver_logbook/models/trip_category.dart';
 import 'package:driver_logbook/models/trip_location.dart';
 import 'package:driver_logbook/models/trip_status.dart';
+import 'package:driver_logbook/models/vehicle.dart';
 import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,11 +21,11 @@ class TripController {
     });
   }
 
-  void startTrip(int mileage, String vin, TripLocation startLocation) {
+  void startTrip(int mileage, Vehicle vehicle, TripLocation startLocation) {
     _prefs.reload();
     _currentTrip = Trip(
       startMileage: mileage,
-      vin: vin,
+      vehicleJson: jsonEncode(vehicle.toJson()),
       tripCategory:
           TripCategory.values[_prefs.getInt('tripCategory2') ?? 0].toString(),
       tripStatus: TripStatus.inProgress.toString(),
