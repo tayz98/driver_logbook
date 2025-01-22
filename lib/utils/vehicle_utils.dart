@@ -1,4 +1,36 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class VehicleUtils {
+  // format of map: VIN(key) : Vehicle Model(value)
+
+// VIN is composed of 17 characters  divided into specific sections:
+// 1-3: World Manufacturer Identifier (WMI)
+// 4-9: Vehicle Descriptor Section (VDS)
+// 10-17: Vehicle Identifier Section (VIS)
+
+  static final Map<String, String> vehicleModels = {};
+
+  static Future<void> initializeVehicleModels() async {
+    await dotenv.load(fileName: ".env");
+    vehicleModels[dotenv.get('SKODA_CITIGO_2016_VIN',
+        fallback: 'UNKNOWN_VIN')] = 'Skoda Citigo 2016';
+    vehicleModels[dotenv.get('BMW_F21_2013_VIN', fallback: 'UNKNOWN_VIN')] =
+        'BMW F21 2013';
+    // add more if needed
+  }
+
+  static String getVehicleMileageCommand(String vin) {
+    String? model = vehicleModels[vin];
+    switch (model) {
+      case 'Skoda Citigo 2016':
+        return '2210E01';
+      case 'BMW F21 2013':
+        throw Exception('Not implemented yet');
+      default:
+        throw Exception('Unknown vehicle model');
+    }
+  }
+
   /// Converts a hex string (e.g., "544D42") to its ASCII representation ("TMB").
   static String hexToAscii(String hexString) {
     final buffer = StringBuffer();
@@ -9,6 +41,18 @@ class VehicleUtils {
       buffer.write(String.fromCharCode(byteValue));
     }
     return buffer.toString();
+  }
+
+  static int getVehicleKm(String vin, String response) {
+    String? model = vehicleModels[vin];
+    switch (model) {
+      case 'Skoda Citigo 2016':
+        return getVehicleKmOfSkoda(response);
+      case 'BMW F21 2013':
+        throw Exception('Not implemented yet');
+      default:
+        throw Exception('Unknown vehicle model');
+    }
   }
 
   /// Parses the last 4 hex characters of [response] into an integer.

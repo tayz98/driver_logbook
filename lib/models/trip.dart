@@ -3,6 +3,7 @@ import 'package:objectbox/objectbox.dart';
 import 'trip_location.dart';
 import './trip_category.dart';
 import './trip_status.dart';
+import './vehicle.dart';
 
 @Entity()
 class Trip {
@@ -12,9 +13,8 @@ class Trip {
   // TripLocation? endLocation;
   String startLocationJson;
   String? endLocationJson;
-
+  String vehicleJson;
   final int startMileage;
-  final String vin;
   final String startTimestamp;
   String? endTimestamp;
   int? endMileage;
@@ -23,7 +23,7 @@ class Trip {
 
   Trip({
     required this.startMileage,
-    required this.vin,
+    required this.vehicleJson,
     required this.tripCategory,
     required this.tripStatus,
     required this.startLocationJson,
@@ -50,6 +50,9 @@ class Trip {
   set startLocation(TripLocation location) =>
       startLocationJson = jsonEncode(location.toJson());
 
+  set vehicle(Vehicle vehicle) => vehicleJson = jsonEncode(vehicle.toJson());
+  Vehicle get vehicle => Vehicle.fromJson(jsonDecode(vehicleJson));
+
   // Getter/Setter for endLocation
   TripLocation? get endLocation => endLocationJson != null
       ? TripLocation.fromJson(jsonDecode(endLocationJson!))
@@ -70,7 +73,7 @@ class Trip {
       'id': id,
       'startMileage': startMileage,
       'endMileage': endMileage,
-      'vin': vin,
+      'vehicle': vehicle.toJson(),
       'startTimestamp': startTimestamp,
       'endTimestamp': endTimestamp,
       'endDate': endTimestamp,
@@ -88,7 +91,7 @@ Trip {
   id: $id,
   startMileage: $startMileage,
   endMileage: $endMileage,
-  vin: $vin,
+  vehicle: ${vehicle.toString()},
   startTimestamp: $startTimestamp,
   endTimestamp: $endTimestamp,
   tripCategory: $tripCategory,

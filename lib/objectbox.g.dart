@@ -22,7 +22,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
       id: const obx_int.IdUid(5, 1832358271218994760),
       name: 'Trip',
-      lastPropertyId: const obx_int.IdUid(16, 5922150338539166868),
+      lastPropertyId: const obx_int.IdUid(17, 54122279934429300),
       flags: 0,
       properties: <obx_int.ModelProperty>[
         obx_int.ModelProperty(
@@ -39,11 +39,6 @@ final _entities = <obx_int.ModelEntity>[
             id: const obx_int.IdUid(5, 2196072175871417321),
             name: 'endMileage',
             type: 6,
-            flags: 0),
-        obx_int.ModelProperty(
-            id: const obx_int.IdUid(6, 150701777894560759),
-            name: 'vin',
-            type: 9,
             flags: 0),
         obx_int.ModelProperty(
             id: const obx_int.IdUid(7, 5943347980171961364),
@@ -68,6 +63,11 @@ final _entities = <obx_int.ModelEntity>[
         obx_int.ModelProperty(
             id: const obx_int.IdUid(16, 5922150338539166868),
             name: 'endLocationJson',
+            type: 9,
+            flags: 0),
+        obx_int.ModelProperty(
+            id: const obx_int.IdUid(17, 54122279934429300),
+            name: 'vehicleJson',
             type: 9,
             flags: 0)
       ],
@@ -161,7 +161,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
         9032816223888766268,
         7835324415654395656,
         3832763960385620046,
-        1948612003747309004
+        1948612003747309004,
+        150701777894560759
       ],
       retiredRelationUids: const [7730691983047863070],
       modelVersion: 5,
@@ -178,7 +179,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           object.id = id;
         },
         objectToFB: (Trip object, fb.Builder fbb) {
-          final vinOffset = fbb.writeString(object.vin);
           final endTimestampOffset = object.endTimestamp == null
               ? null
               : fbb.writeString(object.endTimestamp!);
@@ -189,16 +189,17 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final endLocationJsonOffset = object.endLocationJson == null
               ? null
               : fbb.writeString(object.endLocationJson!);
-          fbb.startTable(17);
+          final vehicleJsonOffset = fbb.writeString(object.vehicleJson);
+          fbb.startTable(18);
           fbb.addInt64(0, object.id);
           fbb.addInt64(3, object.startMileage);
           fbb.addInt64(4, object.endMileage);
-          fbb.addOffset(5, vinOffset);
           fbb.addOffset(6, endTimestampOffset);
           fbb.addOffset(11, tripCategoryOffset);
           fbb.addOffset(12, tripStatusOffset);
           fbb.addOffset(14, startLocationJsonOffset);
           fbb.addOffset(15, endLocationJsonOffset);
+          fbb.addOffset(16, vehicleJsonOffset);
           fbb.finish(fbb.endTable());
           return object.id;
         },
@@ -207,8 +208,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final rootOffset = buffer.derefObject(0);
           final startMileageParam =
               const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0);
-          final vinParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 14, '');
+          final vehicleJsonParam =
+              const fb.StringReader(asciiOptimization: true)
+                  .vTableGet(buffer, rootOffset, 36, '');
           final tripCategoryParam =
               const fb.StringReader(asciiOptimization: true)
                   .vTableGet(buffer, rootOffset, 26, '');
@@ -227,7 +229,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
                   .vTableGetNullable(buffer, rootOffset, 16);
           final object = Trip(
               startMileage: startMileageParam,
-              vin: vinParam,
+              vehicleJson: vehicleJsonParam,
               tripCategory: tripCategoryParam,
               tripStatus: tripStatusParam,
               startLocationJson: startLocationJsonParam,
@@ -256,26 +258,27 @@ class Trip_ {
   static final endMileage =
       obx.QueryIntegerProperty<Trip>(_entities[0].properties[2]);
 
-  /// See [Trip.vin].
-  static final vin = obx.QueryStringProperty<Trip>(_entities[0].properties[3]);
-
   /// See [Trip.endTimestamp].
   static final endTimestamp =
-      obx.QueryStringProperty<Trip>(_entities[0].properties[4]);
+      obx.QueryStringProperty<Trip>(_entities[0].properties[3]);
 
   /// See [Trip.tripCategory].
   static final tripCategory =
-      obx.QueryStringProperty<Trip>(_entities[0].properties[5]);
+      obx.QueryStringProperty<Trip>(_entities[0].properties[4]);
 
   /// See [Trip.tripStatus].
   static final tripStatus =
-      obx.QueryStringProperty<Trip>(_entities[0].properties[6]);
+      obx.QueryStringProperty<Trip>(_entities[0].properties[5]);
 
   /// See [Trip.startLocationJson].
   static final startLocationJson =
-      obx.QueryStringProperty<Trip>(_entities[0].properties[7]);
+      obx.QueryStringProperty<Trip>(_entities[0].properties[6]);
 
   /// See [Trip.endLocationJson].
   static final endLocationJson =
+      obx.QueryStringProperty<Trip>(_entities[0].properties[7]);
+
+  /// See [Trip.vehicleJson].
+  static final vehicleJson =
       obx.QueryStringProperty<Trip>(_entities[0].properties[8]);
 }
