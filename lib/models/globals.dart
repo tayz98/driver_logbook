@@ -5,6 +5,7 @@ import 'package:driver_logbook/notification_configuration.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // services
 // init the foreground service
@@ -28,7 +29,7 @@ void initForegroundService() {
       playSound: false,
     ),
     foregroundTaskOptions: ForegroundTaskOptions(
-      eventAction: ForegroundTaskEventAction.repeat(4000),
+      eventAction: ForegroundTaskEventAction.repeat(10000),
       autoRunOnBoot: true,
       autoRunOnMyPackageReplaced: true,
       allowWakeLock: true,
@@ -37,11 +38,9 @@ void initForegroundService() {
   );
 }
 
-Future<bool> get isServiceRunning => FlutterForegroundTask.isRunningService;
-
 // start the bluetooth-telemetry service and show a notification
 Future<ServiceRequestResult?> startBluetoothService() async {
-  if (await isServiceRunning) {
+  if (await FlutterForegroundTask.isRunningService) {
     debugPrint('Service is already running. Exiting the method.');
     return null;
   }
@@ -74,15 +73,19 @@ bool privateTripsAllowed = false;
 
 // system permissions
 final List<Permission> permissions = [
+  // location related:
   Permission.location,
   Permission.locationAlways,
   Permission.locationWhenInUse,
+  // notifications:
   Permission.notification,
+  // bluetooth:
   Permission.bluetoothScan,
   Permission.bluetoothConnect,
+  // background related:
   if (Platform.isAndroid) Permission.scheduleExactAlarm,
   if (Platform.isAndroid) Permission.ignoreBatteryOptimizations,
-  //Permission.backgroundRefresh, // TODO: check if this is needed
+  if (Platform.isIOS) Permission.backgroundRefresh,
 ];
 bool arePermissionsGranted = false;
 
@@ -121,6 +124,12 @@ Future<void> requestAllPermissions(BuildContext context) async {
     if (context.mounted) _showPermissionsDeniedDialog(context);
   } finally {
     arePermissionsGranted = allGranted;
+    if (arePermissionsGranted) {
+      SharedPreferences.getInstance().then((prefs) {
+        // remember permission state
+        prefs.setBool('arePermissionsGranted', arePermissionsGranted);
+      });
+    }
   }
 }
 

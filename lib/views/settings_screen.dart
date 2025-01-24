@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:driver_logbook/widgets/button_template.dart';
 import 'package:driver_logbook/models/globals.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Settings extends StatefulWidget {
@@ -13,8 +14,9 @@ class Settings extends StatefulWidget {
 
 class SettingsState extends State<Settings> {
   bool? _isServiceRunning;
+
   Future<void> checkService() async {
-    final tempBool = await isServiceRunning;
+    final tempBool = await FlutterForegroundTask.isRunningService;
     setState(() {
       _isServiceRunning = tempBool;
     });
@@ -105,16 +107,6 @@ class SettingsState extends State<Settings> {
                         debugPrint('Error: $e');
                       }
                     }),
-                // Button useless because of permanently denied permissions
-                // const SizedBox(height: 8),
-                // CustomButton(
-                //     label: "Berechtigungen anfordern",
-                //     onPressed: arePermissionsGranted
-                //         ? null
-                //         : () async {
-                //             await requestAllPermissions(context);
-                //           }),
-
                 const SizedBox(height: 8),
                 // Allow the enduser to see the ui and set the category for a trip
                 CustomButton(

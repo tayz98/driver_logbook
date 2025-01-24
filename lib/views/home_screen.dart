@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:driver_logbook/models/globals.dart';
 import 'package:driver_logbook/models/trip_category.dart';
 import 'package:driver_logbook/objectbox.dart';
+import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/views/settings_screen.dart';
 import 'package:driver_logbook/widgets/choose_trip_mode_buttons.dart';
 import 'package:flutter/material.dart';
@@ -18,12 +19,12 @@ class Home extends StatefulWidget {
 
 class HomeState extends State<Home> {
   // variables:
-  CustomBluetoothService? _customBluetoothService;
+  CustomBluetoothService? _customBluetoothService; // used for scanning
   final StreamController<dynamic> _userDataStreamController =
-      StreamController.broadcast();
+      StreamController.broadcast(); // used for sending data to the service
   Stream<dynamic> get userDataStream => _userDataStreamController.stream;
-  SharedPreferences? _prefs;
-  int? _newModeIndex;
+  SharedPreferences? _prefs; // used for storing persistent data
+  int? _newModeIndex; // current mode index (trip category)
 
   @override
   initState() {
@@ -35,9 +36,12 @@ class HomeState extends State<Home> {
       _prefs = prefs;
     });
     FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
-    _startListeningToChangesAndRedirectToTask();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await requestAllPermissions(context);
+      final areGranted = _prefs?.getBool('arePermissionsGranted') ?? false;
+      if (!areGranted) {
+        // prevent requesting permissions if they are already granted
+        await requestAllPermissions(context);
+      }
       initForegroundService();
       // start the background service automatically on startup
       if (await FlutterForegroundTask.isRunningService == false &&
@@ -48,12 +52,12 @@ class HomeState extends State<Home> {
       if (await FlutterForegroundTask.isRunningService &&
           arePermissionsGranted) {}
     });
+    _startListeningToChangesAndRedirectToTask();
   }
 
   @override
   void dispose() {
     FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
-    // _customBluetoothService = null;
     ObjectBox.store.close();
     _userDataStreamController.close();
     super.dispose();
@@ -68,16 +72,32 @@ class HomeState extends State<Home> {
   void _startListeningToChangesAndRedirectToTask() {
     _userDataStreamController.stream.listen((data) async {
       if (!arePermissionsGranted) {
-        debugPrint("Permissions not granted. Waiting...");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Berechtigungen fehlen.',
+              ),
+            ),
+          );
+        }
         return;
       }
 
-      if (await isServiceRunning == false) {
-        debugPrint("Task is not running. Waiting...");
+      if (false == await FlutterForegroundTask.isRunningService) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Dienst nicht gestartet.',
+              ),
+            ),
+          );
+        }
         return;
       }
       FlutterForegroundTask.sendDataToTask(data);
-      debugPrint("Data sent to task: $data");
+      CustomLogger.d("Data sent to task: $data");
     });
   }
 
@@ -142,7 +162,7 @@ class HomeState extends State<Home> {
                 initialMode:
                     TripCategory.values[_prefs?.getInt('tripCategory2') ?? 0],
                 onModeChanged: (newMode) async {
-                  if (await isServiceRunning == false) {
+                  if (false == await FlutterForegroundTask.isRunningService) {
                     if (context.mounted) {
                       _showServiceNotRunningError(context);
                     }

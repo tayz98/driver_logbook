@@ -29,6 +29,7 @@ Future<void> main() async {
   final isPrivateTripsAllowed = prefs.getBool('privateTripsAllowed');
 
   if (isPrivateTripsAllowed == false) {
+    // SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     exit(0);
   }
   await dotenv.load(fileName: ".env");
