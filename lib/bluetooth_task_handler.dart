@@ -52,6 +52,7 @@ class BluetoothTaskHandler extends TaskHandler {
       _scanResultsSubscription; //  for handling scan results
   late Guid targetService;
   late String targetName;
+  bool _isDeviceSetup = false;
 
   // telemetry-related:
   String? _vehicleVin; // used for saving the vin
@@ -263,33 +264,39 @@ class BluetoothTaskHandler extends TaskHandler {
     if (Platform.isAndroid) {
       await FlutterBluePlus.turnOn();
     }
+
     // start scanning for devices continuously when no device is connected
     _bleDisconnectTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       // in production set to to 100 seconds
       CustomLogger.d("BLE disconnect timer started");
-      if (_connectionState == BluetoothConnectionState.disconnected) {
-        CustomLogger.d("Starting scan after 10 seconds and no connection");
+      if (FlutterBluePlus.connectedDevices.isEmpty) {
+        CustomLogger.d("No connected devices, starting scan");
         _scanDevices();
+      } else {
+        if (!_isDeviceSetup) {
+          CustomLogger.d(
+              "Device not setup in ble disconnect timer, setting up");
+          _setupConnectedDevice(FlutterBluePlus.connectedDevices.first);
+        }
       }
     });
-    CustomLogger.d(
-        "Fetching and connecting to devices in _initializeBluetooth");
-    await _fetchAndConnectToDevices();
-    CustomLogger.d("_initializeBluetooth completed");
 
     /// listen  for connection state changes and manage the connection
     _connectionStateSubscription ??=
         FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {
       _connectionState = event.connectionState;
-      CustomLogger.i("Connection state: $_connectionState");
+      CustomLogger.i(
+          "Event Device: ${event.device}, New Connection state: $_connectionState");
       if (_connectionState == BluetoothConnectionState.connected) {
         _bleDisconnectTimer?.cancel();
         _bleDisconnectTimer = null;
+        CustomLogger.d("BLE disconnect timer cancelled on connection");
         // initialize device on connection
-        await setupConnectedDevice(event.device);
+        await _setupConnectedDevice(event.device);
         // if connected, cancel scans
         CustomLogger.d("BLE disconnect timer cancelled on connection");
       } else if (_connectionState == BluetoothConnectionState.disconnected) {
+        _isDeviceSetup = false;
         // thinking.. if a device disconnected, check if previously connected devices can be reconnected
         if (!event.device.isAutoConnectEnabled) {
           // if auto connect is disabled by disconnecting, enable it again
@@ -303,7 +310,7 @@ class BluetoothTaskHandler extends TaskHandler {
           // for a trip, we only need one device to be connected
           // so if we start driving and other devices but one disconnect, we know for sure that the current connected device is the one we need
           // we could also track the rssi, but it would overcomplicate things
-          setupConnectedDevice(FlutterBluePlus.connectedDevices.first);
+          _setupConnectedDevice(FlutterBluePlus.connectedDevices.first);
         }
         _tripCancelTimer?.cancel();
         CustomLogger.d("Trip cancel timer cancelled");
@@ -359,6 +366,10 @@ class BluetoothTaskHandler extends TaskHandler {
         await _fetchAndConnectToDevices();
       }
     });
+    CustomLogger.d(
+        "Fetching and connecting to devices in _initializeBluetooth");
+    await _fetchAndConnectToDevices();
+    CustomLogger.d("_initializeBluetooth completed");
   }
 
   // not needed for now
@@ -409,8 +420,10 @@ class BluetoothTaskHandler extends TaskHandler {
     }
   }
 
-  Future<void> setupConnectedDevice(BluetoothDevice device) async {
+  Future<void> _setupConnectedDevice(BluetoothDevice device) async {
+    CustomLogger.d("Setting up connected device: ${device.remoteId.str}");
     _activeDevice = device;
+    _isDeviceSetup = true;
     CustomLogger.i("Connected to device: ${_activeDevice?.remoteId.str}");
     await _requestMtu(device);
     CustomLogger.d("MTU requested");
@@ -542,7 +555,11 @@ class BluetoothTaskHandler extends TaskHandler {
       CustomLogger.d("ELM327 initialized status saved to shared preferences");
     }
     CustomLogger.i("ELM327 initialized");
-    await _startVoltageTimer();
+    if (_isElm327Initialized) {
+      await _startVoltageTimer();
+    } else {
+      CustomLogger.fatal("ELM327 initializion failed");
+    }
 
     // check every 3 seconds if the engine is running
     // if it is running, we can start a trip
@@ -553,12 +570,10 @@ class BluetoothTaskHandler extends TaskHandler {
     _voltageTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       CustomLogger.d("Calling _voltageTimer");
       try {
-        if (_isElm327Initialized) {
-          final success = await _sendCommand(voltageCommand);
-          if (!success) {
-            CustomLogger.e("Failed to send voltage command");
-            return;
-          }
+        final success = await _sendCommand(voltageCommand);
+        if (!success) {
+          CustomLogger.e("Failed to send voltage command");
+          return;
         }
       } catch (e) {
         CustomLogger.e("Error in _voltageTimer: $e");
@@ -731,7 +746,7 @@ class BluetoothTaskHandler extends TaskHandler {
         final voltageIntValue = int.tryParse(voltageString);
         if (voltageIntValue != null) {
           CustomLogger.d("Voltage: $voltageIntValue");
-          _voltageVal = voltageIntValue / 1000;
+          _voltageVal = voltageIntValue / 10;
           if (_voltageVal! >= 13.0) {
             CustomLogger.d(
                 "Voltage is at or above 13V, engine is running, cancelling timer");
