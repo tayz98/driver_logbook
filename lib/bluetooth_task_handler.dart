@@ -50,8 +50,8 @@ class BluetoothTaskHandler extends TaskHandler {
   //     _dataSubscription; // for obversing incoming data from elm327
   StreamSubscription<List<ScanResult>>?
       _scanResultsSubscription; //  for handling scan results
-  final Guid targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
-  final String targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
+  late Guid targetService;
+  late String targetName;
 
   // telemetry-related:
   String? _vehicleVin; // used for saving the vin
@@ -435,6 +435,8 @@ class BluetoothTaskHandler extends TaskHandler {
     _prefs = await SharedPreferences.getInstance();
     CustomLogger.d('Initialized SharedPreferences');
     await dotenv.load(fileName: ".env");
+    targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
+    targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
     CustomLogger.d('Initialized dotenv');
     try {
       await ObjectBox.create();
