@@ -1,1 +1,1 @@
-enum TripStatus { notStarted, inProgress, finished, cancelled }
+enum TripStatus { inProgress, completed, incorrect }

@@ -29,7 +29,7 @@ class TripRepository {
   static List<Trip> getFinishedTrips() {
     return ObjectBox.store
         .box<Trip>()
-        .query(Trip_.tripStatus.equals(TripStatus.finished.toString()))
+        .query(Trip_.tripStatus.equals(TripStatus.completed.toString()))
         .build()
         .find();
   }
@@ -38,7 +38,7 @@ class TripRepository {
   static List<Trip> getCancelledTrips() {
     return ObjectBox.store
         .box<Trip>()
-        .query(Trip_.tripStatus.equals(TripStatus.cancelled.toString()))
+        .query(Trip_.tripStatus.equals(TripStatus.incorrect.toString()))
         .build()
         .find();
   }
@@ -48,8 +48,8 @@ class TripRepository {
     return ObjectBox.store
         .box<Trip>()
         .query(Trip_.tripStatus
-            .equals(TripStatus.cancelled.toString())
-            .or(Trip_.tripStatus.equals(TripStatus.finished.toString())))
+            .equals(TripStatus.incorrect.toString())
+            .or(Trip_.tripStatus.equals(TripStatus.completed.toString())))
         .build()
         .find();
   }

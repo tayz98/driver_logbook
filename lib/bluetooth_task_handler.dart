@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:driver_logbook/controllers/trip_controller.dart';
 import 'package:driver_logbook/models/trip_location.dart';
-import 'package:driver_logbook/models/trip_status.dart';
 import 'package:driver_logbook/objectbox.dart';
 import 'package:driver_logbook/objectbox.g.dart';
 import 'package:driver_logbook/repositories/trip_repository.dart';
@@ -38,47 +37,47 @@ class BluetoothTaskHandler extends TaskHandler {
   GpsService? _gpsService; // used for getting the location
 
   // Bluetooth related:
-  BluetoothDevice? _connectedDevice; // connected device
+  BluetoothDevice? _activeDevice; // connected device
   BluetoothCharacteristic? _writeCharacteristic; // data to send to elm327
   BluetoothCharacteristic? _notifyCharacteristic; // data to receive from elm327
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected; // default connection state
   StreamSubscription<OnConnectionStateChangedEvent>?
       _connectionStateSubscription; // for handling connection states
-  StreamSubscription<OnReadRssiEvent>?
-      _rssiStreamSubscription; // rssi stream to handle readings
-  final int _disconnectRssiThreshold = -85; // threshold to disconnect a device
-  final int _goodRssiThreshold =
-      -75; // threshold to cancel a pending disconnect
-  // static const Duration _rssiDuration =
-  //     Duration(seconds: 10); // interval to read rssi
   List<String> knownRemoteIds = []; // list of known remote ids to connect to
   int? _tripCategoryIndex; // index of the trip category
   // StreamSubscription<List<int>>?
   //     _dataSubscription; // for obversing incoming data from elm327
   StreamSubscription<List<ScanResult>>?
       _scanResultsSubscription; //  for handling scan results
+  final Guid targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
+  final String targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
 
   // telemetry-related:
   String? _vehicleVin; // used for saving the vin
   int? _vehicleMileage; // used for saving and tracking the mileage
+  double?
+      _voltageVal; // used for checking voltage of the vehicle (engine runnning)
   bool _isElm327Initialized = false; // default state of elm327
   TripLocation? _tempLocation;
+  Vehicle? _tempVehicle;
   static const String vinCommand =
       "0902"; // standardized obd2 command for requesting the vin
+  static const String voltageCommand =
+      "ATRV"; // ELM327 system command for checking vehicle voltage
 
   // Timer:
   Timer?
       _mileageSendCommandTimer; // used for sending mileage requests continuously
-  Timer? _vinSendCommandTimer; // used for sending vin requests continuously
   Timer? _dataTimeoutTimer; // used for ending the trip if no data is received
   Timer?
       _elm327Timer; // used for reinitializing elm327 if a consecutive trip happens
   Timer? _readRssiTimer; // used for reading the rssi continuously
   Timer? _tripTimeoutTimer; // used for ending the trip if no data is received
   Timer? _tripCancelTimer; // used for cancelling the trip if connection is lost
-  Timer? _rssiDisconnectTimer; // timer to disconnect a device if rssi is low
   Timer? _bleDisconnectTimer; // timer to scan for devices if disconnected
+  Timer? _voltageTimer; // timer to read the voltage of the vehicle
+  // voltage is used to determine if the engine is running, which is used to determine if a trip is running
 
   String _responseBuffer = ''; // buffer for incoming data from the elm327
 
@@ -194,43 +193,20 @@ class BluetoothTaskHandler extends TaskHandler {
 
   /// Make sure everything is cleaned up and reset when the task is destroyed.
   Future<void> _cleanUpAndResetData() async {
-    _tripController = null;
-    _gpsService = null;
-    _vehicleMileage = null;
-    _vehicleVin = null;
-    _isElm327Initialized = false;
-    _tempLocation = TripLocation(
-        street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
-    _responseBuffer = '';
-    _store.close();
-    _writeCharacteristic = null;
-    _notifyCharacteristic = null;
-    _connectionState = BluetoothConnectionState.disconnected;
-    _connectionStateSubscription?.cancel();
-    _connectionStateSubscription = null;
-    _rssiStreamSubscription?.cancel();
-    _rssiStreamSubscription = null;
-    _rssiDisconnectTimer?.cancel();
-    _rssiDisconnectTimer = null;
+    _cancelAllStreams();
+    _cancelALlTimersExceptBleDisconnect();
+    if (_tripController?.currentTrip != null) {
+      await _endTrip();
+    }
+    _cancelALlTimersExceptBleDisconnect();
     _bleDisconnectTimer?.cancel();
     _bleDisconnectTimer = null;
-    _tripTimeoutTimer?.cancel();
-    _tripTimeoutTimer = null;
-    _tripCancelTimer?.cancel();
-    _tripCancelTimer = null;
-    _scanResultsSubscription?.cancel();
-    _scanResultsSubscription = null;
-    if (_connectedDevice != null) {
-      debugPrint("Disconnecting device on destroy");
-      await _connectedDevice!.disconnectAndUpdateStream();
-      _connectedDevice = null;
-    }
+    _resetAllTripVariables();
+    _resetAllMiscVariables();
   }
 
   // cancels all timer except ble disconnect timer
   void _cancelALlTimersExceptBleDisconnect() {
-    _vinSendCommandTimer?.cancel();
-    _vinSendCommandTimer = null;
     _mileageSendCommandTimer?.cancel();
     _mileageSendCommandTimer = null;
     _dataTimeoutTimer?.cancel();
@@ -243,7 +219,40 @@ class BluetoothTaskHandler extends TaskHandler {
     _tripTimeoutTimer = null;
     _tripCancelTimer?.cancel();
     _tripCancelTimer = null;
+    _voltageTimer?.cancel();
+    _voltageTimer = null;
   }
+
+  // reset all trip related variables
+  void _resetAllTripVariables() {
+    _vehicleMileage = null;
+    _vehicleVin = null;
+    _isElm327Initialized = false;
+    _notifyCharacteristic = null;
+    _writeCharacteristic = null;
+    _activeDevice = null;
+    _responseBuffer = '';
+    _activeDevice = null;
+    _voltageVal = null;
+    _tempLocation = null;
+    _tempVehicle = null;
+  }
+
+  // reset all data related variables
+  void _resetAllMiscVariables() {
+    _tripController = null;
+    _gpsService = null;
+    _store.close();
+  }
+
+  // cancel all streams
+  void _cancelAllStreams() {
+    _connectionStateSubscription?.cancel();
+    _scanResultsSubscription?.cancel();
+    _connectionStateSubscription = null;
+    _scanResultsSubscription = null;
+  }
+
   // --------------------------------------------------------------------------
   // PRIVATE METHODS: Bluetooth
   // --------------------------------------------------------------------------
@@ -263,6 +272,10 @@ class BluetoothTaskHandler extends TaskHandler {
         _scanDevices();
       }
     });
+    CustomLogger.d(
+        "Fetching and connecting to devices in _initializeBluetooth");
+    await _fetchAndConnectToDevices();
+    CustomLogger.d("_initializeBluetooth completed");
 
     /// listen  for connection state changes and manage the connection
     _connectionStateSubscription ??=
@@ -270,32 +283,27 @@ class BluetoothTaskHandler extends TaskHandler {
       _connectionState = event.connectionState;
       CustomLogger.i("Connection state: $_connectionState");
       if (_connectionState == BluetoothConnectionState.connected) {
-        // prevent connecting to multiple devices
-        if (_connectedDevice != null) {
-          final newDeviceRssi = await event.device.readRssi();
-          final connectedDeviceRssi = await _connectedDevice!.readRssi();
-          if (newDeviceRssi > connectedDeviceRssi) {
-            CustomLogger.w(
-                "New device has a better RSSI, disconnecting old device: ${_connectedDevice?.remoteId.str}");
-            await _connectedDevice?.disconnectAndUpdateStream();
-            await Future.delayed(const Duration(
-                milliseconds: 500)); // wait for disconnect to finish
-          } else {
-            CustomLogger.w(
-                "New device has a worse RSSI: ${event.device.remoteId.str}, nothing changed");
-            return;
-          }
-        }
-        // initialize device on connection
-        setupConnectedDevice(event.device);
-        // if connected, cancel scans
         _bleDisconnectTimer?.cancel();
         _bleDisconnectTimer = null;
+        // initialize device on connection
+        await setupConnectedDevice(event.device);
+        // if connected, cancel scans
         CustomLogger.d("BLE disconnect timer cancelled on connection");
       } else if (_connectionState == BluetoothConnectionState.disconnected) {
-        // handle unwanted devices here
-        if (_connectedDevice?.remoteId != event.device.remoteId) {
-          return;
+        // thinking.. if a device disconnected, check if previously connected devices can be reconnected
+        if (!event.device.isAutoConnectEnabled) {
+          // if auto connect is disabled by disconnecting, enable it again
+          // this usually shouldn't happen, but for safety reasons we check it
+          event.device
+              .connectAndUpdateStream(); // without wait, to not block subsequent code
+        }
+        if (FlutterBluePlus.connectedDevices.length == 1) {
+          // thought process:
+          // with BLE the app can connect to multiple devices, but only one connection is "active/used"
+          // for a trip, we only need one device to be connected
+          // so if we start driving and other devices but one disconnect, we know for sure that the current connected device is the one we need
+          // we could also track the rssi, but it would overcomplicate things
+          setupConnectedDevice(FlutterBluePlus.connectedDevices.first);
         }
         _tripCancelTimer?.cancel();
         CustomLogger.d("Trip cancel timer cancelled");
@@ -305,21 +313,20 @@ class BluetoothTaskHandler extends TaskHandler {
                 "Waiting 15 seconds to check if device is still disconnected");
             if (_connectionState == BluetoothConnectionState.disconnected) {
               CustomLogger.i("Device is still disconnected, cancelling trip");
-              _endTrip(TripStatus.cancelled);
+              _endTrip();
+            } else {
+              CustomLogger.i("Device is connected again, cancelling timer");
+              return;
+              // if a trip is in progress, but the bluetooth connection got interrupted for a short time, return.
             }
           });
         }
         _cancelALlTimersExceptBleDisconnect();
-        _connectedDevice = null;
-        _writeCharacteristic = null;
-        _notifyCharacteristic = null;
-        _isElm327Initialized = false;
-        _vehicleMileage = null;
-        _vehicleVin = null;
-        CustomLogger.i(
-            "Setting all variables to null on disconnection: $_vehicleVin, $_vehicleMileage");
+        _resetAllTripVariables();
+        CustomLogger.i("Setting all variables to null on disconnection");
         // start scanning for devices continuously again
         _bleDisconnectTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+          // usually 100 seconds in production
           CustomLogger.d(
               "BLE disconnect timer started again after disconnection");
           if (_connectionState == BluetoothConnectionState.disconnected) {
@@ -327,16 +334,11 @@ class BluetoothTaskHandler extends TaskHandler {
             _scanDevices();
           }
         });
-        // reconnect to known devices
-        Future.delayed(const Duration(seconds: 10), () async {
-          CustomLogger.d("Reconnecting to known devices after 10 seconds");
-          await _fetchAndConnectToDevices();
-        });
       }
     });
     // use a subscription to update the scan results and save them
     _scanResultsSubscription ??=
-        FlutterBluePlus.onScanResults.listen((results) {
+        FlutterBluePlus.onScanResults.listen((results) async {
       CustomLogger.d("Scan results: $results");
       if (results.isNotEmpty) {
         for (var result in results) {
@@ -354,78 +356,12 @@ class BluetoothTaskHandler extends TaskHandler {
           }
         }
         // fetch scanned device(s) to initiate new connections
-        _fetchAndConnectToDevices();
-      }
-    });
-    CustomLogger.d(
-        "Fetching and connecting to devices in _initializeBluetooth");
-    _fetchAndConnectToDevices();
-
-    // keep track of the rssi to disconnect a device
-    // best case is: a ble connection only establishes when the driver is in his car
-    _rssiStreamSubscription ??=
-        FlutterBluePlus.events.onReadRssi.listen((event) {
-      if (event.device.remoteId == _connectedDevice?.remoteId) {
-        final currentRssi = event.rssi;
-        CustomLogger.i("Current RSSI: $currentRssi");
-
-        // If rssi is below -85 for 10+ seconds, disconnect
-        if (currentRssi < _disconnectRssiThreshold) {
-          CustomLogger.i("RSSI below -85, starting disconnect timer");
-          // toggle on:
-          _rssiDisconnectTimer = Timer(const Duration(seconds: 10), () {
-            _connectedDevice?.disconnectAndUpdateStream();
-            CustomLogger.i("Device disconnected due to low RSSI");
-          });
-        }
-        // If rssi climbs back above -75, cancel the pending disconnect
-        else if (currentRssi > _goodRssiThreshold &&
-            _rssiDisconnectTimer?.isActive == true) {
-          _rssiDisconnectTimer!.cancel();
-          _rssiDisconnectTimer = null;
-          CustomLogger.i("RSSI above -75, cancelling disconnect timer");
-        }
-      }
-    });
-    CustomLogger.d("_initializeBluetooth completed");
-  }
-
-  Future<void> _checkPeriodicallyForRssi() async {
-    _readRssiTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      final connectedDevices = FlutterBluePlus.connectedDevices;
-
-      if (connectedDevices.isEmpty) {
-        CustomLogger.d("No connected devices");
-        return;
-      }
-      if (connectedDevices.length == 1) {
-        connectedDevices.first.readRssi().then((rssi) {
-          CustomLogger.d("RSSI: $rssi");
-        });
-        return;
-      }
-      // map with device and rssi
-      final deviceRssiMap = <BluetoothDevice, int>{};
-      for (var device in connectedDevices) {
-        final rssi = await device.readRssi();
-        deviceRssiMap[device] = rssi;
-      }
-      final sortedEntries = deviceRssiMap.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-
-      final bestSignalDevice = sortedEntries.first.key;
-      final bestRssi = sortedEntries.first.value;
-
-      if (_connectedDevice?.remoteId != bestSignalDevice.remoteId) {
-        CustomLogger.d("Switching to BEST signal device: "
-            "${bestSignalDevice.remoteId.str} ($bestRssi dBm)");
-
-        await _connectedDevice!.disconnectAndUpdateStream();
-        setupConnectedDevice(bestSignalDevice);
+        await _fetchAndConnectToDevices();
       }
     });
   }
 
+  // not needed for now
   void _initializeTime() async {
     await initializeDateFormatting('de_DE');
     Intl.defaultLocale = 'de_DE';
@@ -433,15 +369,12 @@ class BluetoothTaskHandler extends TaskHandler {
 
   Future<void> _discoverCharacteristicsAndStartElm327(
       BluetoothDevice device) async {
-    if (_connectionState == BluetoothConnectionState.disconnected ||
-        await _connectedDevice?.isDisconnecting.first == true) {
-      CustomLogger.d("Can't discover characteristics, device is disconnected");
+    if (FlutterBluePlus.connectedDevices.isEmpty) {
+      CustomLogger.d("Can't discover characteristics, no connected device");
       return;
     }
-    final Guid targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
     CustomLogger.d("Discovering characteristics for service: $targetService");
-    List<BluetoothService> services =
-        await _connectedDevice!.discoverServices();
+    List<BluetoothService> services = await _activeDevice!.discoverServices();
     for (BluetoothService service in services) {
       if (service.uuid == targetService) {
         for (BluetoothCharacteristic c in service.characteristics) {
@@ -465,7 +398,8 @@ class BluetoothTaskHandler extends TaskHandler {
           _notifyCharacteristic!.lastValueStream.listen((data) {
         handleReceivedData(data);
       });
-      _connectedDevice?.cancelWhenDisconnected(dataSubscription);
+      // TODO: check if this makes any problems, maybe it's not needed
+      _activeDevice?.cancelWhenDisconnected(dataSubscription);
 
       // only initialize elm327 if the needed characteristics are found
       // and listen for incoming data
@@ -476,32 +410,17 @@ class BluetoothTaskHandler extends TaskHandler {
   }
 
   Future<void> setupConnectedDevice(BluetoothDevice device) async {
-    _connectedDevice = device;
-    CustomLogger.i("Connected to device: ${_connectedDevice?.remoteId.str}");
+    _activeDevice = device;
+    CustomLogger.i("Connected to device: ${_activeDevice?.remoteId.str}");
     await _requestMtu(device);
     CustomLogger.d("MTU requested");
-    _checkPeriodicallyForRssi();
     CustomLogger.d("Read rssi timer started (checking every 5 seconds)");
     await _discoverCharacteristicsAndStartElm327(device);
     CustomLogger.d("Characteristics discovered and ELM327 started");
-    if (_elm327Timer != null || _elm327Timer?.isActive == true) {
-      // avoid multiple timers
-      _elm327Timer?.cancel();
-      CustomLogger.d("Cancelled ELM327 timer");
-    }
-    _elm327Timer = Timer.periodic(const Duration(seconds: 15), (_) {
-      CustomLogger.d("Calling ELM327 timer");
-      if (!_isElm327Initialized) {
-        // TODO: maybe rethink this approach
-        CustomLogger.d(
-            "15 Seconds over and not initialized, trying to reinitialize ELM327");
-        _initializeElm327();
-      }
-    });
   }
 
   Future<void> _requestMtu(BluetoothDevice dev) async {
-    if (_connectionState == BluetoothConnectionState.disconnected) return;
+    if (_activeDevice == null) return;
     try {
       await dev.requestMtu(128, predelay: 0);
       CustomLogger.d("MTU after request: ${dev.mtu}");
@@ -526,7 +445,7 @@ class BluetoothTaskHandler extends TaskHandler {
     }
     knownRemoteIds = _prefs.getStringList("knownRemoteIds") ?? [];
     CustomLogger.d('Initialized knownRemoteIds');
-    _tripController ??= TripController();
+    _tripController ??= await TripController.create();
     CustomLogger.d('Initialized TripController');
     _gpsService ??= GpsService();
     CustomLogger.d('Initialized GpsService');
@@ -543,8 +462,8 @@ class BluetoothTaskHandler extends TaskHandler {
     try {
       CustomLogger.i("Scanning for devices...");
       await FlutterBluePlus.startScan(
-          withServices: [Guid(dotenv.get('TARGET_SERVICE', fallback: ''))],
-          withNames: [dotenv.get("TARGET_ADV_NAME", fallback: "")],
+          withServices: [targetService],
+          withNames: [targetName],
           timeout: const Duration(seconds: 2));
     } catch (e) {
       CustomLogger.e("Error in _scanDevices: $e");
@@ -553,7 +472,7 @@ class BluetoothTaskHandler extends TaskHandler {
   }
 
   Future<void> _fetchAndConnectToDevices() async {
-    _prefs.reload();
+    _prefs.reload(); // reload shared preferences if received from the main app
     CustomLogger.d("Fetching and connecting to devices...");
     CustomLogger.i("Known remote ids: $knownRemoteIds");
     if (knownRemoteIds.isEmpty) {
@@ -579,16 +498,14 @@ class BluetoothTaskHandler extends TaskHandler {
   // --------------------------------------------------------------------------
 
   Future<void> _initializeElm327() async {
-    if (_isElm327Initialized ||
-        _connectionState != BluetoothConnectionState.connected) {
-      CustomLogger.d("Can't reinitialize ELM327 again (race condition)");
+    if (FlutterBluePlus.connectedDevices.isEmpty) {
+      CustomLogger.w("Can't reinitialize ELM327, no connected device");
       return;
     }
     debugPrint("Initializing ELM327");
-    // TODO: maybe save initialized elm327 in shared preferences
     // to skip these commands on the next trip
-    final bool wasAlreadyInitialized = _connectedDevice != null
-        ? _prefs.getBool(_connectedDevice!.remoteId.str) ?? false
+    final bool wasAlreadyInitialized = _activeDevice != null
+        ? _prefs.getBool(_activeDevice!.remoteId.str) ?? false
         : false;
     if (!wasAlreadyInitialized) {
       List<String> initCommands = [
@@ -618,45 +535,100 @@ class BluetoothTaskHandler extends TaskHandler {
     }
     // elm327 is only considered to be setup here.
     _isElm327Initialized = true;
-    if (_connectedDevice != null) {
-      await _prefs.setBool(_connectedDevice!.remoteId.str, true);
+    if (_activeDevice != null) {
+      await _prefs.setBool(_activeDevice!.remoteId.str, _isElm327Initialized);
+      CustomLogger.d("ELM327 initialized status saved to shared preferences");
     }
     CustomLogger.i("ELM327 initialized");
-    _vinSendCommandTimer =
-        Timer.periodic(const Duration(seconds: 3), (_) async {
-      CustomLogger.d("Calling _vinSendCommandTimer");
+    await _startVoltageTimer();
+
+    // check every 3 seconds if the engine is running
+    // if it is running, we can start a trip
+  }
+
+  Future<void> _startVoltageTimer() async {
+    _voltageTimer?.cancel();
+    _voltageTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      CustomLogger.d("Calling _voltageTimer");
       try {
-        if (_isElm327Initialized && _vehicleVin == null) {
-          CustomLogger.d("Sending VIN request");
-          await _sendCommand(vinCommand);
-        } else {
-          _vinSendCommandTimer?.cancel();
-          _vinSendCommandTimer = null;
-          CustomLogger.d("Cancelled _vinSendCommandTimer");
-          _mileageSendCommandTimer =
-              Timer.periodic(const Duration(seconds: 4), (_) async {
-            CustomLogger.d("Calling _mileageSendCommandTimer");
-            try {
-              if (_isElm327Initialized && _vehicleVin != null) {
-                CustomLogger.d("Sending mileage request");
-                await _sendCommand(
-                    VehicleUtils.getVehicleMileageCommand(_vehicleVin!));
-              }
-            } catch (e) {
-              CustomLogger.e("Error in _mileageSendCommandTimer: $e");
-            }
-          });
+        if (_isElm327Initialized) {
+          final success = await _sendCommand(voltageCommand);
+          if (!success) {
+            CustomLogger.e("Failed to send voltage command");
+            return;
+          }
         }
       } catch (e) {
-        CustomLogger.e("Error in _vinSendCommandTimer: $e");
+        CustomLogger.e("Error in _voltageTimer: $e");
       }
     });
+  }
+
+  Future<bool> _requestVin() async {
+    // keep asking VIN for 5 times, then continue with mileage
+    try {
+      if (_isElm327Initialized && _vehicleVin == null) {
+        CustomLogger.d("Sending VIN request");
+        for (int i = 0; i < 5; i++) {
+          final success = await _sendCommand(vinCommand);
+          if (!success) {
+            CustomLogger.w("Failed to send VIN command");
+          }
+          await Future.delayed(const Duration(seconds: 1));
+          if (_vehicleMileage != null) {
+            CustomLogger.i("VIN set after $i tries");
+            break;
+          }
+        }
+        if (_vehicleVin == null) {
+          CustomLogger.fatal("VIN not set after 5 tries");
+          return false;
+        } else {
+          CustomLogger.d("VIN set: $_vehicleVin");
+        }
+      }
+    } catch (e) {
+      CustomLogger.fatal("Error in requesting VIN: $e");
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _requestMileage() async {
+    try {
+      _mileageSendCommandTimer =
+          Timer.periodic(const Duration(seconds: 2), (_) async {
+        CustomLogger.d("Calling _mileageSendCommandTimer");
+        if (_isElm327Initialized) {
+          CustomLogger.d("Sending mileage request");
+          final success = await _sendCommand(
+              VehicleUtils.getVehicleMileageCommand(_vehicleVin!));
+          if (!success) {
+            CustomLogger.e("Failed to send mileage command");
+          }
+        }
+      });
+    } catch (e) {
+      CustomLogger.e("Error in requesting mileage: $e");
+    }
+  }
+
+  Future<void> _startTelemetryCollection() async {
+    CustomLogger.d("Starting telemetry collection");
+    _startTrip();
+    final isVinSet = await _requestVin();
+    if (isVinSet) {
+      CustomLogger.d("VIN is set, starting mileage request");
+      await _requestMileage();
+    } else {
+      _endTrip();
+    }
   }
 
   // send command to elm327
   Future<bool> _sendCommand(String command) async {
     if (_connectionState == BluetoothConnectionState.disconnected ||
-        await _connectedDevice?.isDisconnecting.first == true) {
+        await _activeDevice?.isDisconnecting.first == true) {
       CustomLogger.d("Can't send command, device is disconnected");
       return false;
     }
@@ -724,7 +696,6 @@ class BluetoothTaskHandler extends TaskHandler {
     "\u00A0", // Non-breaking space
     "SEARCHING",
     "STOPPED",
-    "ELM327v15",
     "NODATA",
     "TIMEOUT",
     "CANERROR",
@@ -745,6 +716,27 @@ class BluetoothTaskHandler extends TaskHandler {
 
     if (cleanedResponse.isEmpty) return; // unsolicited response, ignore it
     // every mileage response starts with 6210
+
+    // TODO: check if this is working!!!!!!
+    if (cleanedResponse.contains("V") && _voltageVal == null) {
+      final parts = cleanedResponse.split("V");
+      if (parts.isNotEmpty) {
+        final voltageString = parts[0];
+        // for debugging:
+        for (var part in parts) {
+          CustomLogger.d("Voltage part: $part");
+        }
+        final voltageIntValue = int.tryParse(voltageString);
+        if (voltageIntValue != null) {
+          CustomLogger.d("Voltage: $voltageIntValue");
+          _voltageVal = voltageIntValue / 1000;
+          _voltageTimer?.cancel();
+          _voltageTimer = null;
+          CustomLogger.d("Voltage: $_voltageVal");
+          _startTelemetryCollection();
+        }
+      }
+    }
     if (cleanedResponse.contains("6210")) {
       // startsWith doesn't work for some reason, that's why contains is used
       _handleResponseToMileageCommand(cleanedResponse);
@@ -778,22 +770,16 @@ class BluetoothTaskHandler extends TaskHandler {
     CustomLogger.d("Calculated mileage: $mileage");
     if (isMileageValid) {
       _vehicleMileage = mileage;
-      CustomLogger.d("Mileage valid and now set to: $_vehicleMileage");
-      if (_tripController?.currentTrip == null) {
-        CustomLogger.i("Trip not running, starting trip...");
-        await _startTrip();
-      }
-
       _tripTimeoutTimer = Timer(const Duration(seconds: 10), () async {
         if (_tripController?.currentTrip != null) {
-          await _endTrip(TripStatus.finished);
+          await _endTrip();
         }
       });
     } else {
       CustomLogger.w("Mileage is invalid");
       if (_tripController?.currentTrip != null) {
         CustomLogger.i("Trip running, cancelling trip...");
-        await _endTrip(TripStatus.cancelled); // Added await
+        await _endTrip();
       }
     }
   }
@@ -802,21 +788,23 @@ class BluetoothTaskHandler extends TaskHandler {
     try {
       if (_tripController!.currentTrip == null) {
         try {
-          final position = await _gpsService!.currentPosition;
+          final position = await _gpsService!.currentPosition ??
+              _gpsService!.lastKnownPosition;
           CustomLogger.d("Current position: $position");
           _tempLocation = await _gpsService!.getLocationFromPosition(position);
+          if (_tempLocation == null || _tempLocation?.street == 'not found') {
+            CustomLogger.w("Location not found, checking recent locations");
+          }
           CustomLogger.d("Location found: $_tempLocation");
+          if (_vehicleVin != null) {
+            _tempVehicle = Vehicle.fromVin(_vehicleVin!);
+          }
+          _tripController!
+              .startTrip(_vehicleMileage, _tempVehicle, _tempLocation);
         } catch (e) {
-          CustomLogger.e("Error in _startTrip: $e");
-          _tempLocation = TripLocation(
-              street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
+          CustomLogger.e("Error in starting trip: $e");
         }
-        if (_vehicleVin == null || _vehicleMileage == null) {
-          CustomLogger.fatal("VIN or mileage is null, cannot start trip");
-          return;
-        }
-        _tripController!.startTrip(
-            _vehicleMileage!, Vehicle.fromVin(_vehicleVin!), _tempLocation!);
+
         CustomLogger.i(_tripController!.currentTrip.toString());
         CustomLogger.i("Fahrtaufzeichnung hat begonnen");
         updateNotificationText("Fahrtaufzeichnung", "Die Fahrt hat begonnen");
@@ -829,7 +817,7 @@ class BluetoothTaskHandler extends TaskHandler {
     }
   }
 
-  Future<void> _endTrip(TripStatus status) async {
+  Future<void> _endTrip() async {
     if (_tripController!.currentTrip == null) {
       CustomLogger.fatal("No trip to end");
       return;
@@ -839,27 +827,15 @@ class BluetoothTaskHandler extends TaskHandler {
       CustomLogger.d("End position: $endPosition");
       _tempLocation = await _gpsService!.getLocationFromPosition(endPosition);
       CustomLogger.d("New Location found: $_tempLocation");
+      _tripController!.endTrip(_tempLocation, _vehicleMileage);
     } catch (e) {
       debugPrint("Error in _endTelemetryCollection: $e");
-      _tempLocation = TripLocation(
-          street: "Unbekannt", city: "Unbekannt", postalCode: "Unbekannt");
     }
-    if (_vehicleMileage == null) {
-      CustomLogger.fatal("mileage is null, cannot end trip");
-      return;
-    }
-    _tripController!.endTrip(_tempLocation, _vehicleMileage!, status);
-    CustomLogger.i(_tripController!.currentTrip.toString());
-    CustomLogger.i("Fahrt beendet mit Status: $status");
-    updateNotificationText(
-        "Fahrt beendet mit Status: $status", "Die Fahrt wurde beendet");
-    _vehicleVin = null;
-    _vehicleMileage = null;
-    CustomLogger.i("Resetted vin and mileage: $_vehicleVin, $_vehicleMileage");
+    updateNotificationText("Fahrt beendet", "Die Fahrt wurde beendet");
     _cancelALlTimersExceptBleDisconnect();
     CustomLogger.d("Cancelled all Timers on trip end");
-    // needed for reinitializing elm327
-    _isElm327Initialized = false;
-    CustomLogger.d("Set ELM327 to false after trip end: $_isElm327Initialized");
+    _resetAllTripVariables();
+    await _startVoltageTimer();
+    CustomLogger.d("Resetted all trip variables on trip end");
   }
 }

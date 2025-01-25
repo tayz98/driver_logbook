@@ -184,12 +184,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
               : fbb.writeString(object.endTimestamp!);
           final tripCategoryOffset = fbb.writeString(object.tripCategory);
           final tripStatusOffset = fbb.writeString(object.tripStatus);
-          final startLocationJsonOffset =
-              fbb.writeString(object.startLocationJson);
+          final startLocationJsonOffset = object.startLocationJson == null
+              ? null
+              : fbb.writeString(object.startLocationJson!);
           final endLocationJsonOffset = object.endLocationJson == null
               ? null
               : fbb.writeString(object.endLocationJson!);
-          final vehicleJsonOffset = fbb.writeString(object.vehicleJson);
+          final vehicleJsonOffset = object.vehicleJson == null
+              ? null
+              : fbb.writeString(object.vehicleJson!);
           fbb.startTable(18);
           fbb.addInt64(0, object.id);
           fbb.addInt64(3, object.startMileage);
@@ -207,18 +210,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final buffer = fb.BufferContext(fbData);
           final rootOffset = buffer.derefObject(0);
           final startMileageParam =
-              const fb.Int64Reader().vTableGet(buffer, rootOffset, 10, 0);
+              const fb.Int64Reader().vTableGetNullable(buffer, rootOffset, 10);
           final vehicleJsonParam =
               const fb.StringReader(asciiOptimization: true)
-                  .vTableGet(buffer, rootOffset, 36, '');
-          final tripCategoryParam =
-              const fb.StringReader(asciiOptimization: true)
-                  .vTableGet(buffer, rootOffset, 26, '');
-          final tripStatusParam = const fb.StringReader(asciiOptimization: true)
-              .vTableGet(buffer, rootOffset, 28, '');
+                  .vTableGetNullable(buffer, rootOffset, 36);
           final startLocationJsonParam =
               const fb.StringReader(asciiOptimization: true)
-                  .vTableGet(buffer, rootOffset, 32, '');
+                  .vTableGetNullable(buffer, rootOffset, 32);
           final endLocationJsonParam =
               const fb.StringReader(asciiOptimization: true)
                   .vTableGetNullable(buffer, rootOffset, 34);
@@ -227,15 +225,20 @@ obx_int.ModelDefinition getObjectBoxModel() {
           final endTimestampParam =
               const fb.StringReader(asciiOptimization: true)
                   .vTableGetNullable(buffer, rootOffset, 16);
+          final tripStatusParam = const fb.StringReader(asciiOptimization: true)
+              .vTableGet(buffer, rootOffset, 28, '');
+          final tripCategoryParam =
+              const fb.StringReader(asciiOptimization: true)
+                  .vTableGet(buffer, rootOffset, 26, '');
           final object = Trip(
               startMileage: startMileageParam,
               vehicleJson: vehicleJsonParam,
-              tripCategory: tripCategoryParam,
-              tripStatus: tripStatusParam,
               startLocationJson: startLocationJsonParam,
               endLocationJson: endLocationJsonParam,
               endMileage: endMileageParam,
-              endTimestamp: endTimestampParam)
+              endTimestamp: endTimestampParam,
+              tripStatus: tripStatusParam,
+              tripCategory: tripCategoryParam)
             ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
 
           return object;

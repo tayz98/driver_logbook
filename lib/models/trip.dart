@@ -9,27 +9,26 @@ import './vehicle.dart';
 class Trip {
   @Id()
   int id = 0;
-  // final TripLocation startLocation;
-  // TripLocation? endLocation;
-  String startLocationJson;
+
+  String? startLocationJson;
   String? endLocationJson;
-  String vehicleJson;
-  final int startMileage;
-  final String startTimestamp;
+  String? vehicleJson;
+  int? startMileage;
   String? endTimestamp;
   int? endMileage;
   String tripCategory;
   String tripStatus;
+  final String startTimestamp;
 
   Trip({
-    required this.startMileage,
-    required this.vehicleJson,
-    required this.tripCategory,
-    required this.tripStatus,
-    required this.startLocationJson,
+    this.startMileage,
+    this.vehicleJson,
+    this.startLocationJson,
     this.endLocationJson,
     this.endMileage,
     this.endTimestamp,
+    required this.tripStatus,
+    required this.tripCategory,
   }) : startTimestamp = DateTime.now().toIso8601String();
 
   TripCategory get tripCategoryEnum {
@@ -41,17 +40,32 @@ class Trip {
 
   // Getter/Setter for startLocation
   TripLocation get startLocation {
-    if (startLocationJson.isEmpty) {
+    if (startLocationJson == null || startLocationJson == "null") {
       throw const FormatException("startLocationJson is empty");
     }
-    return TripLocation.fromJson(jsonDecode(startLocationJson));
+    return TripLocation.fromJson(jsonDecode(startLocationJson!));
+  }
+
+  bool isTripCompleted() {
+    return startMileage != null &&
+        endMileage != null &&
+        startLocationJson != null &&
+        endLocationJson != null &&
+        startLocationJson != "null" &&
+        endLocationJson != "null" &&
+        vehicleJson != null;
   }
 
   set startLocation(TripLocation location) =>
       startLocationJson = jsonEncode(location.toJson());
 
   set vehicle(Vehicle vehicle) => vehicleJson = jsonEncode(vehicle.toJson());
-  Vehicle get vehicle => Vehicle.fromJson(jsonDecode(vehicleJson));
+  Vehicle get vehicle {
+    if (vehicleJson == null || vehicleJson == "null") {
+      throw const FormatException("vehicleJson is empty");
+    }
+    return Vehicle.fromJson(jsonDecode(vehicleJson!));
+  }
 
   // Getter/Setter for endLocation
   TripLocation? get endLocation => endLocationJson != null
