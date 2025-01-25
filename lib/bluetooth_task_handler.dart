@@ -732,6 +732,14 @@ class BluetoothTaskHandler extends TaskHandler {
         if (voltageIntValue != null) {
           CustomLogger.d("Voltage: $voltageIntValue");
           _voltageVal = voltageIntValue / 1000;
+          if (_voltageVal! >= 13.0) {
+            CustomLogger.d(
+                "Voltage is at or above 13V, engine is running, cancelling timer");
+            CustomLogger.d("Voltage is: $_voltageVal");
+            _voltageTimer?.cancel();
+            _voltageTimer = null;
+            _startTelemetryCollection();
+          }
           _voltageTimer?.cancel();
           _voltageTimer = null;
           CustomLogger.d("Voltage: $_voltageVal");
