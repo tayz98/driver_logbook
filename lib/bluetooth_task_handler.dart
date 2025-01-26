@@ -212,15 +212,17 @@ class BluetoothTaskHandler extends TaskHandler {
           await _setupConnectedDevice(await _findNearestDevice());
         }
         CustomLogger.d("Trip cancel timer cancelled");
-        Future.delayed(const Duration(seconds: 15), () async {
+        // cancel the trip if bluetooth connection is lost for more than 10 seconds
+        Future.delayed(const Duration(seconds: 10), () async {
           CustomLogger.d(
               "Waiting 15 seconds to check if device is still disconnected");
           if (event.connectionState == BluetoothConnectionState.disconnected) {
-            CustomLogger.i("Device is still disconnected, cancelling trip");
             if (_elm327Controller?.deviceId == event.device.remoteId.str) {
+              CustomLogger.w(
+                  "Connection to ELM327 lost for more than 10 seconds");
               if (_elm327Controller!.isTripInProgress) {
-                await _elm327Controller!.endTrip();
-                _elm327Controller = null;
+                CustomLogger.w("cancelling trip and resetting ELM327");
+                await _diposeElmController();
               }
             }
           } else {
@@ -230,13 +232,12 @@ class BluetoothTaskHandler extends TaskHandler {
           }
         });
       }
-      CustomLogger.i("Setting all variables to null on disconnection");
     });
 
     // use a subscription to update the scan results and save them
     _scanResultsSubscription ??=
         FlutterBluePlus.onScanResults.listen((results) async {
-      CustomLogger.d("Scan results: $results");
+      CustomLogger.i("Scan results: $results");
       if (results.isNotEmpty) {
         for (var result in results) {
           if (knownRemoteIds.contains(result.device.remoteId.str)) {
@@ -267,8 +268,8 @@ class BluetoothTaskHandler extends TaskHandler {
     Intl.defaultLocale = 'de_DE';
   }
 
-  void _diposeElmController() {
-    _elm327Controller?.dispose();
+  Future<void> _diposeElmController() async {
+    await _elm327Controller?.dispose();
     _elm327Controller = null;
   }
 
@@ -322,9 +323,10 @@ class BluetoothTaskHandler extends TaskHandler {
           writeCharacteristic: writeCharacteristic,
           notifyCharacteristic: notifyCharacteristic,
           device: device);
-      CustomLogger.d(
-          "Characteristics found, setting notify value to true and start listening");
+      CustomLogger.i(
+          "Chraracteristics found, starting ELM327 with device: ${device.remoteId.str}");
       _dataSubscription = notifyCharacteristic.lastValueStream.listen((data) {
+        CustomLogger.d("Received data!");
         _elm327Controller!.handleReceivedData(data);
       });
       if (_dataSubscription != null) {
@@ -333,9 +335,11 @@ class BluetoothTaskHandler extends TaskHandler {
       final initialized = await _elm327Controller?.initialize() ?? false;
       if (!initialized) {
         CustomLogger.e("ELM327 initialization failed");
-        return;
+        // if initialization failed, disconnect and set shared preference initializization status to false
+        await _prefs.setBool(device.remoteId.str, false);
+        device.disconnectAndUpdateStream();
       } else {
-        CustomLogger.i("ELM327 initialized successfully");
+        CustomLogger.i("ELM327 successfully initialized");
         CustomLogger.d("Starting checking for voltage");
         await _elm327Controller!.startVoltageTimer();
       }
@@ -346,16 +350,13 @@ class BluetoothTaskHandler extends TaskHandler {
 
   Future<void> _setupConnectedDevice(BluetoothDevice device) async {
     CustomLogger.d("Setting up connected device: ${device.remoteId.str}");
-    CustomLogger.i("Connected to device: ${device.remoteId.str}");
     await _requestMtu(device);
-    CustomLogger.d("MTU requested");
-    CustomLogger.d("Read rssi timer started (checking every 5 seconds)");
     await _discoverCharacteristicsAndStartElm327(device);
-    CustomLogger.d("Characteristics discovered and ELM327 started");
   }
 
   Future<void> _requestMtu(BluetoothDevice device) async {
     try {
+      CustomLogger.d("Requesting MTU...");
       await device.requestMtu(128, predelay: 0);
       CustomLogger.d("MTU after request: ${device.mtu}");
     } catch (e) {
@@ -390,7 +391,7 @@ class BluetoothTaskHandler extends TaskHandler {
   // find new devices
   Future<void> _scanDevices() async {
     try {
-      CustomLogger.i("Scanning for devices...");
+      CustomLogger.d("Scanning for devices...");
       await FlutterBluePlus.startScan(
           withServices: [targetService],
           withNames: [targetName],
@@ -415,7 +416,7 @@ class BluetoothTaskHandler extends TaskHandler {
       try {
         final device = BluetoothDevice.fromId(id);
         await device.connectAndUpdateStream();
-        CustomLogger.d("Starting auto connect to device: $id");
+        CustomLogger.i("Starting auto connect to device: $id");
         break;
       } catch (e) {
         CustomLogger.e("Error in _fetchAndConnectToDevices: $e");

@@ -7,12 +7,14 @@ import 'package:driver_logbook/services/gps_service.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Elm327Controller {
   final BluetoothDevice _device;
   get deviceId => _device.remoteId;
   final BluetoothCharacteristic _writeCharacteristic;
+  // ignore: unused_field
   final BluetoothCharacteristic _notifyCharacteristic;
   bool _isInitialized = false;
   bool _isTripInProgress = false;
@@ -25,20 +27,17 @@ class Elm327Controller {
       _voltageVal; // used for checking voltage of the vehicle (engine runnning)
   TripLocation? _tempLocation;
   Vehicle? _tempVehicle;
-  static const String vinCommand =
+  final String vinCommand =
       "0902"; // standardized obd2 command for requesting the vin
-  static const String voltageCommand =
+  final String voltageCommand =
       "ATRV"; // ELM327 system command for checking vehicle voltage
   Timer? _voltageTimer; // timer to read the voltage of the vehicle
   Timer? _tripTimeoutTimer; // used for ending the trip if no data is received
-  Timer? _tripCancelTimer; // used for cancelling the trip if connection is lost
-  Timer? _dataTimeoutTimer; // used for ending the trip if no data is received
   Timer?
       _mileageSendCommandTimer; // used for sending mileage requests continuously
   String _responseBuffer = ''; // buffer for incoming data from the elm327
   final TripController? _tripController; // controller for managing trips
   final GpsService? _gpsService; // used for getting the location
-  DateTime? _debugTimestamp;
 
   Elm327Controller({
     required BluetoothDevice device,
@@ -51,7 +50,10 @@ class Elm327Controller {
         _gpsService = GpsService();
 
   Future<bool> initialize() async {
-    if (_isInitialized) return true;
+    if (_isInitialized) {
+      CustomLogger.w("ELM327 already initialized");
+      return true;
+    }
     final prefs = await SharedPreferences.getInstance();
 
     final bool isAlreadyInitialized =
@@ -63,19 +65,19 @@ class Elm327Controller {
         // "ATD", // reset defaults
         "ATSP0", // Set Protocol to Automatic
         "ATE0", // Echo Off
-        "ATL0", // Linefeeds Off
-        "ATS0", // Spaces Off
+        // "ATL0", // Linefeeds Off
+        // "ATS0", // Spaces Off
         "ATH1", // Headers On
         "ATSH 7E0", // Set Header to 7E0
       ];
       for (String cmd in initCommands) {
         bool success = await sendCommand(cmd);
-        _debugTimestamp = DateTime.now();
         if (!success) {
           CustomLogger.e("Failed to send command: $cmd");
           return false;
         } else {
-          await Future.delayed(const Duration(milliseconds: 4000));
+          // TODO: test if this short delay is not causing any issues
+          await Future.delayed(const Duration(milliseconds: 1100));
         }
       }
     } else {
@@ -83,6 +85,13 @@ class Elm327Controller {
     }
     _isInitialized = true;
     await prefs.setBool(_device.remoteId.str, _isInitialized);
+    // problem:
+    // if the adapter is taken out of the car, it will reset and needs a new initialization
+    // so, saving the initialization status to shared preferences might not be the best idea
+    // on the other hand, initializing the adapter every time a connection is established
+    // takes too long and is not practical
+    // i could try tuning the initialization commands to make it faster
+    // but from my experience, the adapter needs at least 3 seconds to respond to the commands
     CustomLogger.d("ELM327 initialized status saved to shared preferences");
     CustomLogger.i("ELM327 initialized");
     return _isInitialized;
@@ -102,8 +111,6 @@ class Elm327Controller {
     _responseBuffer = '';
     _voltageTimer?.cancel();
     _tripTimeoutTimer?.cancel();
-    _tripCancelTimer?.cancel();
-    _dataTimeoutTimer?.cancel();
     _mileageSendCommandTimer?.cancel();
     CustomLogger.i("ELM327 disposed");
   }
@@ -132,7 +139,8 @@ class Elm327Controller {
 
         CustomLogger.i(_tripController.currentTrip.toString());
         CustomLogger.i("Fahrtaufzeichnung hat begonnen");
-        // updateNotificationText("Fahrtaufzeichnung", "Die Fahrt hat begonnen");
+        _updateForegroundNotificationText(
+            "Fahrtaufzeichnung", "Die Fahrt hat begonnen");
       } else {
         CustomLogger.fatal("Trip already running");
       }
@@ -142,7 +150,13 @@ class Elm327Controller {
     }
   }
 
+  void _updateForegroundNotificationText(String title, String content) {
+    FlutterForegroundTask.updateService(
+        notificationTitle: title, notificationText: content);
+  }
+
   Future<void> endTrip() async {
+    _mileageSendCommandTimer?.cancel();
     _isTripInProgress = false;
     if (_tripController!.currentTrip == null) {
       CustomLogger.fatal("No trip to end");
@@ -158,8 +172,9 @@ class Elm327Controller {
     } catch (e) {
       CustomLogger.e("Error in _endTrip: $e");
     }
-    // _cancelALlTimersExceptBleDisconnect();
     CustomLogger.d("Cancelled all Timers on trip end");
+    _updateForegroundNotificationText(
+        "Fahrtaufzeichnung", "Die Fahrt hat geendet");
     // _resetAllTripVariables();
     await startVoltageTimer();
     // after trip ends, start voltage timer again
@@ -168,8 +183,8 @@ class Elm327Controller {
   }
 
   Future<bool> sendCommand(String command) async {
-    if (_device.isDisconnected == true) {
-      CustomLogger.e("Device is not connected");
+    if (_device.isDisconnected) {
+      CustomLogger.w("Device is not connected, can't send command!");
       return false;
     }
     CustomLogger.i("Sending command: $command");
@@ -206,6 +221,7 @@ class Elm327Controller {
     "]",
     "[",
     ">",
+    "\n",
     "<",
     "?",
     ":",
@@ -236,7 +252,7 @@ class Elm327Controller {
     // every mileage response starts with 6210
 
     if (cleanedResponse.contains("V")) {
-      CustomLogger.d("Voltage contains V");
+      CustomLogger.d("Voltage command response");
       final parts = cleanedResponse.split("V");
       if (parts.isNotEmpty) {
         final voltageString = parts.first;
@@ -246,15 +262,13 @@ class Elm327Controller {
         }
         final voltageIntValue = int.tryParse(voltageString);
         if (voltageIntValue != null) {
-          CustomLogger.d("Voltage: $voltageIntValue");
           _voltageVal = voltageIntValue / 10;
           CustomLogger.d("Voltage is: $_voltageVal");
-          // final rssi = await _device.readRssi();
-
-          // if (_voltageVal! >= 13.0 && rssi >= -70) {
-          if (_voltageVal! >= 13.0) {
-            CustomLogger.d(
-                "Voltage is at or above 13V, engine is running, cancelling timer");
+          final rssi = await _device.readRssi();
+          if (_voltageVal! >= 13.0 && rssi >= -70) {
+            CustomLogger.i(
+                "Voltage is at or above 13V, engine is running, and signal strength is good");
+            CustomLogger.d("Cancelling voltage timer and starting telemetry");
             _voltageTimer?.cancel();
             _voltageTimer = null;
             await _startTelemetryCollection();
