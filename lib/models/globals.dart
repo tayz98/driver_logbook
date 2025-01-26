@@ -87,7 +87,6 @@ final List<Permission> permissions = [
   if (Platform.isAndroid) Permission.ignoreBatteryOptimizations,
   if (Platform.isIOS) Permission.backgroundRefresh,
 ];
-bool arePermissionsGranted = false;
 
 // request all permissions needed for the foreground service to work
 Future<void> requestAllPermissions(BuildContext context) async {
@@ -123,11 +122,10 @@ Future<void> requestAllPermissions(BuildContext context) async {
     allGranted = false;
     if (context.mounted) _showPermissionsDeniedDialog(context);
   } finally {
-    arePermissionsGranted = allGranted;
-    if (arePermissionsGranted) {
+    if (allGranted) {
       SharedPreferences.getInstance().then((prefs) {
         // remember permission state
-        prefs.setBool('arePermissionsGranted', arePermissionsGranted);
+        prefs.setBool('arePermissionsGranted', allGranted);
       });
     }
   }

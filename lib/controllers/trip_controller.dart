@@ -10,24 +10,27 @@ import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TripController {
+  // Singleton
+  TripController._internal();
   Trip? _currentTrip;
   Trip? get currentTrip => _currentTrip;
+  late final SharedPreferences _prefs;
 
-  late SharedPreferences _prefs;
-
-  static Future<TripController> create() async {
-    final controller = TripController();
-    controller._prefs = await SharedPreferences.getInstance();
-    return controller;
+  static final TripController _instance = TripController._internal();
+  factory TripController() => _instance;
+  static Future<TripController> initialize() async {
+    _instance._prefs = await SharedPreferences.getInstance();
+    return _instance;
   }
 
   void startTrip(int? mileage, Vehicle? vehicle, TripLocation? startLocation) {
-    _prefs.reload();
+    _instance._prefs.reload();
     _currentTrip = Trip(
       startMileage: mileage,
       vehicleJson: jsonEncode(vehicle?.toJson()),
-      tripCategory:
-          TripCategory.values[_prefs.getInt('tripCategory2') ?? 0].toString(),
+      tripCategory: TripCategory
+          .values[_instance._prefs.getInt('tripCategory2') ?? 0]
+          .toString(),
       tripStatus: TripStatus.inProgress.toString(),
       startLocationJson: jsonEncode(startLocation?.toJson()),
     );

@@ -44,13 +44,11 @@ class HomeState extends State<Home> {
       }
       initForegroundService();
       // start the background service automatically on startup
-      if (await FlutterForegroundTask.isRunningService == false &&
-          arePermissionsGranted) {
+      if (await FlutterForegroundTask.isRunningService == false && areGranted) {
         await startBluetoothService();
       }
       // Check if service is running and set the state accordingly
-      if (await FlutterForegroundTask.isRunningService &&
-          arePermissionsGranted) {}
+      if (await FlutterForegroundTask.isRunningService && areGranted) {}
     });
     _startListeningToChangesAndRedirectToTask();
   }
@@ -71,7 +69,7 @@ class HomeState extends State<Home> {
   // sends index of category or remoteIds of BT-Devices to the service
   void _startListeningToChangesAndRedirectToTask() {
     _userDataStreamController.stream.listen((data) async {
-      if (!arePermissionsGranted) {
+      if (_prefs!.getBool('arePermissionsGranted') == false) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

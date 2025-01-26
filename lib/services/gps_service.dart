@@ -5,6 +5,8 @@ import 'package:geocoding/geocoding.dart';
 import 'package:driver_logbook/models/trip_location.dart';
 
 class GpsService {
+  static final GpsService _singleton = GpsService._internal();
+  factory GpsService() => _singleton;
   get currentPosition async => await Geolocator.getCurrentPosition();
   get lastKnownPosition async => await Geolocator.getLastKnownPosition();
 
@@ -13,7 +15,7 @@ class GpsService {
   LocationPermission? _locationPermission;
   LocationPermission? get locationPermission => _locationPermission;
 
-  GpsService() {
+  GpsService._internal() {
     _initialize();
     setLocaleIdentifier('de_DE');
     _checkStatusAndPermissions();
