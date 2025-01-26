@@ -149,7 +149,8 @@ class Elm327Controller {
       return;
     }
     try {
-      final endPosition = await _gpsService!.currentPosition;
+      final endPosition =
+          await _gpsService!.currentPosition ?? _gpsService.lastKnownPosition;
       CustomLogger.d("End position: $endPosition");
       _tempLocation = await _gpsService.getLocationFromPosition(endPosition);
       CustomLogger.d("New Location found: $_tempLocation");
@@ -157,15 +158,20 @@ class Elm327Controller {
     } catch (e) {
       CustomLogger.e("Error in _endTrip: $e");
     }
-    // updateNotificationText("Fahrt beendet", "Die Fahrt wurde beendet");
     // _cancelALlTimersExceptBleDisconnect();
     CustomLogger.d("Cancelled all Timers on trip end");
     // _resetAllTripVariables();
     await startVoltageTimer();
+    // after trip ends, start voltage timer again
+    // to check if a consecutive trip is started
     CustomLogger.d("Resetted all trip variables on trip end");
   }
 
   Future<bool> sendCommand(String command) async {
+    if (_device.isDisconnected == true) {
+      CustomLogger.e("Device is not connected");
+      return false;
+    }
     CustomLogger.i("Sending command: $command");
     String fullCommand = "$command\r";
     List<int> bytes = utf8.encode(fullCommand);
@@ -184,18 +190,13 @@ class Elm327Controller {
   void handleReceivedData(List<int> data) {
     // decode it and add it to the buffer because responses can be split into multiple parts
     String incomingData = utf8.decode(data);
-    CustomLogger.d("Incoming data: $incomingData");
-    if (incomingData.contains("OK") || incomingData.contains("ELM")) {
-      final tempTimestamp = DateTime.now();
-      final diff = tempTimestamp.difference(_debugTimestamp!);
-      CustomLogger.d("Time difference: $diff, Data: $incomingData");
-    }
+    // CustomLogger.d("Incoming data: $incomingData");
     _responseBuffer += incomingData;
     int endIndex = _responseBuffer.indexOf(">"); // ">" is the end of a response
     while (endIndex != -1) {
       String completeResponse = _responseBuffer.substring(0, endIndex).trim();
       _responseBuffer = _responseBuffer.substring(endIndex + 1);
-      CustomLogger.d("Complete response: $completeResponse");
+      // CustomLogger.d("Complete response: $completeResponse");
       _processCompleteResponse(completeResponse);
       endIndex = _responseBuffer.indexOf(">");
     }
@@ -222,7 +223,7 @@ class Elm327Controller {
   ];
 
   // process the complete response from elm327
-  void _processCompleteResponse(String response) {
+  void _processCompleteResponse(String response) async {
     // remove all unnecessary characters or words
     String cleanedResponse = response;
     for (String str in unwantedStrings) {
@@ -234,10 +235,11 @@ class Elm327Controller {
     if (cleanedResponse.isEmpty) return; // unsolicited response, ignore it
     // every mileage response starts with 6210
 
-    if (cleanedResponse.contains("V") && _voltageVal == null) {
+    if (cleanedResponse.contains("V")) {
+      CustomLogger.d("Voltage contains V");
       final parts = cleanedResponse.split("V");
       if (parts.isNotEmpty) {
-        final voltageString = parts[0];
+        final voltageString = parts.first;
         // for debugging:
         for (var part in parts) {
           CustomLogger.d("Voltage part: $part");
@@ -247,13 +249,15 @@ class Elm327Controller {
           CustomLogger.d("Voltage: $voltageIntValue");
           _voltageVal = voltageIntValue / 10;
           CustomLogger.d("Voltage is: $_voltageVal");
+          // final rssi = await _device.readRssi();
 
+          // if (_voltageVal! >= 13.0 && rssi >= -70) {
           if (_voltageVal! >= 13.0) {
             CustomLogger.d(
                 "Voltage is at or above 13V, engine is running, cancelling timer");
             _voltageTimer?.cancel();
             _voltageTimer = null;
-            _startTelemetryCollection();
+            await _startTelemetryCollection();
           }
         } else {
           CustomLogger.w("Voltage int couldn't be parsed is null");
@@ -302,7 +306,7 @@ class Elm327Controller {
       CustomLogger.fatal("Voltage is null, starting voltage timer");
       return false;
     }
-    const int maxTries = 5;
+    const int maxTries = 10;
     try {
       if (_isInitialized && _vehicleVin == null) {
         CustomLogger.d("Sending VIN request");
@@ -332,9 +336,13 @@ class Elm327Controller {
   }
 
   Future<void> _requestMileage() async {
+    if (_vehicleVin == null) {
+      CustomLogger.fatal("VIN is null, can't request mileage");
+      return;
+    }
     try {
       _mileageSendCommandTimer =
-          Timer.periodic(const Duration(seconds: 2), (_) async {
+          Timer.periodic(const Duration(seconds: 3), (_) async {
         CustomLogger.d("Calling _mileageSendCommandTimer");
         if (_isInitialized) {
           CustomLogger.d("Sending mileage request");
@@ -351,10 +359,15 @@ class Elm327Controller {
   }
 
   Future<void> _startTelemetryCollection() async {
+    if (_isTripInProgress) {
+      CustomLogger.i("Trip already running, skipping telemetry collection");
+      return;
+    }
     CustomLogger.d("Starting telemetry collection");
-    _startTrip();
+    await _startTrip();
     final isVinSet = await _requestVin();
     if (isVinSet) {
+      // VIN is a required field for requesting mileage (see vehicle_utils.dart)
       CustomLogger.d("VIN is set, starting mileage request");
       await _requestMileage();
     } else {
@@ -386,14 +399,19 @@ class Elm327Controller {
   }
 
   void _handleResponseToMileageCommand(String response) async {
+    CustomLogger.d("Handling mileage response");
     _tripTimeoutTimer?.cancel();
+    CustomLogger.d("Trip timeout timer cancelled");
     final mileage = VehicleUtils.getVehicleKm(_vehicleVin!, response);
     final isMileageValid = _checkMileage(mileage);
-    CustomLogger.d("Calculated mileage: $mileage");
+
     if (isMileageValid) {
       _vehicleMileage = mileage;
+      CustomLogger.i("Mileage read: $_vehicleMileage");
+      CustomLogger.d("Trip timeout timer called");
       _tripTimeoutTimer = Timer(const Duration(seconds: 10), () async {
         if (_tripController?.currentTrip != null) {
+          CustomLogger.i("Trip timeout, ending trip...");
           await endTrip();
         }
       });

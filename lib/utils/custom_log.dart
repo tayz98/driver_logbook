@@ -1,6 +1,5 @@
 import 'package:logger/logger.dart';
 import 'package:driver_logbook/services/http_service.dart';
-import 'package:driver_logbook/utils/help.dart';
 
 /// A custom logger that prints messages locally and also sends them to a server.
 class CustomLogger {
@@ -27,7 +26,7 @@ class CustomLogger {
       body: {
         'level': level.toString(),
         'message': message,
-        'timestamp': Helper.formatDateString(DateTime.now().toIso8601String()),
+        'timestamp': DateTime.now().toIso8601String(),
       },
     );
   }

@@ -212,14 +212,15 @@ class BluetoothTaskHandler extends TaskHandler {
           await _setupConnectedDevice(await _findNearestDevice());
         }
         CustomLogger.d("Trip cancel timer cancelled");
-        Future.delayed(const Duration(seconds: 15), () {
+        Future.delayed(const Duration(seconds: 15), () async {
           CustomLogger.d(
               "Waiting 15 seconds to check if device is still disconnected");
           if (event.connectionState == BluetoothConnectionState.disconnected) {
             CustomLogger.i("Device is still disconnected, cancelling trip");
             if (_elm327Controller?.deviceId == event.device.remoteId.str) {
               if (_elm327Controller!.isTripInProgress) {
-                _elm327Controller!.endTrip();
+                await _elm327Controller!.endTrip();
+                _elm327Controller = null;
               }
             }
           } else {
@@ -324,7 +325,6 @@ class BluetoothTaskHandler extends TaskHandler {
       CustomLogger.d(
           "Characteristics found, setting notify value to true and start listening");
       _dataSubscription = notifyCharacteristic.lastValueStream.listen((data) {
-        CustomLogger.d("Data received: $data");
         _elm327Controller!.handleReceivedData(data);
       });
       if (_dataSubscription != null) {
@@ -337,7 +337,7 @@ class BluetoothTaskHandler extends TaskHandler {
       } else {
         CustomLogger.i("ELM327 initialized successfully");
         CustomLogger.d("Starting checking for voltage");
-        _elm327Controller!.startVoltageTimer();
+        await _elm327Controller!.startVoltageTimer();
       }
     } else {
       CustomLogger.e("Characteristics not found, can't start ELM327");
