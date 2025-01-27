@@ -44,7 +44,7 @@ class TripRepository {
   }
 
   // return cancelled and finished trips
-  static List<Trip> getFinishedAndCancelledTrips() {
+  static List<Trip> fetchCompletedAndCancelledTrips() {
     return ObjectBox.store
         .box<Trip>()
         .query(Trip_.tripStatus

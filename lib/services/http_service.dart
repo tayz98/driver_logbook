@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:http/http.dart' as http;
@@ -50,9 +48,7 @@ class HttpService {
       return await http.post(Uri.parse(url),
           headers: _postHeaders, body: jsonEncode(body));
     } catch (e) {
-      debugPrint('Error: $e');
-      return http.Response('Error: $e', 500);
-      // TODO: add more error handling (e.g. rethrow to caller and handle there)
+      rethrow;
     }
   }
 }

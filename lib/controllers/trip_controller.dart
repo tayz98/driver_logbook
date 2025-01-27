@@ -52,7 +52,7 @@ class TripController {
         ? TripStatus.completed
         : TripStatus.incorrect;
     _currentTrip!.tripStatus = status.toString();
-    CustomLogger.i('Trip ended: ${_currentTrip!.toJson()}');
+    CustomLogger.i('Trip ended: ${jsonEncode(_currentTrip!.toJson())}');
     TripRepository.saveTrip(_currentTrip!);
     _currentTrip = null;
   }

@@ -77,7 +77,6 @@ class VehicleUtils {
 
       print("Kilometers (Decimal): $kilometers");
 
-      // Return the result as a double
       return kilometers;
     } catch (e) {
       throw FormatException("Invalid hex value in response: $last4Bytes");

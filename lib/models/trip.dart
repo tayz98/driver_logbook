@@ -98,6 +98,22 @@ class Trip {
     };
   }
 
+  static Trip fromJson(Map<String, dynamic> json) {
+    return Trip(
+      startMileage: json['startMileage'],
+      endMileage: json['endMileage'],
+      vehicleJson: json['vehicle'] != null ? jsonEncode(json['vehicle']) : null,
+      startLocationJson: json['startLocation'] != null
+          ? jsonEncode(json['startLocation'])
+          : null,
+      endLocationJson:
+          json['endLocation'] != null ? jsonEncode(json['endLocation']) : null,
+      endTimestamp: json['endTimestamp'],
+      tripStatus: json['tripStatus'],
+      tripCategory: json['tripCategory'],
+    )..id = json['id'] ?? 0;
+  }
+
   @override
   String toString() {
     return '''

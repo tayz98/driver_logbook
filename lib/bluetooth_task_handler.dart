@@ -23,7 +23,7 @@ void startCallback() {
 }
 
 class BluetoothTaskHandler extends TaskHandler {
-  // Objects:
+  // storing:
   late SharedPreferences
       _prefs; // shared preferences for storing known remote ids and category index
 
@@ -31,40 +31,42 @@ class BluetoothTaskHandler extends TaskHandler {
   StreamSubscription<OnConnectionStateChangedEvent>?
       _connectionStateSubscription; // for handling connection states
   List<String> knownRemoteIds = []; // list of known remote ids to connect to
-  int? _tripCategoryIndex; // index of the trip category
   StreamSubscription<List<int>>?
       _dataSubscription; // for obversing incoming data from elm327
   StreamSubscription<List<ScanResult>>?
       _scanResultsSubscription; //  for handling scan results
-  late Guid targetService;
-  late String targetName;
+  late Guid targetService; // target service for scanning
+  late String targetName; // target name for scanning
   Elm327Controller?
       _elm327Controller; // elm327 controller for handling elm327 commands
 
   // Timer:
   Timer? _scanTimer; // timer to scan for devices if disconnected
 
+  // misc:
+  int? _tripCategoryIndex; // index of the trip category
+
   // --------------------------------------------------------------------------
-  // PUBLIC METHODS: TaskHandler
+  // METHODS: TaskHandler
   // --------------------------------------------------------------------------
 
+// initialize data, bluetooth and (time) when the task is started
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await _initializeData(); // e.g. shared preferences, objectbox, etc.
     _initializeTime(); // initialize time for date formatting
     await _initializeBluetooth(); // complete bluetooth initialization
-    CustomLogger.i('onStart completed');
+    CustomLogger.i('Service successfully started');
   }
 
   /// only used for trasmitting trips to the remote server
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    CustomLogger.d('[BluetoothTaskHandler] onRepeatEvent'); // debug
-    final tripsToTransmit = TripRepository.getFinishedAndCancelledTrips();
-    // if (tripsToTransmit.isEmpty) {
-    //   CustomLogger.d("No trips to transmit");
-    //   return;
-    // }
+    final tripsToTransmit = TripRepository.fetchCompletedAndCancelledTrips();
+    if (tripsToTransmit.isEmpty) {
+      CustomLogger.d("No trips to transmit");
+      return;
+    }
     for (final trip in tripsToTransmit) {
       final response =
           await HttpService().post(type: ServiceType.trip, body: trip.toJson());
@@ -136,8 +138,7 @@ class BluetoothTaskHandler extends TaskHandler {
   /// Called when the task is destroyed.
   @override
   Future<void> onDestroy(DateTime timestamp) async {
-    CustomLogger.d("Data cleaned up");
-    CustomLogger.d("[BluetoothTaskHandler] onDestroy");
+    CustomLogger.d("Cleaning up data on destroy");
     _cancelAllStreams();
     _cancelAllTimer();
     _diposeElmController();
@@ -192,9 +193,12 @@ class BluetoothTaskHandler extends TaskHandler {
         FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {
       CustomLogger.i(
           "Event Device: ${event.device}, New Connection state: $event.connectionState");
+      // on every connection state change, check for the nearest device
+      final tempDevice = await _findNearestDevice();
       if (event.connectionState == BluetoothConnectionState.connected) {
-        // always check for nearest device when a new device is connected
-        await _setupConnectedDevice(await _findNearestDevice());
+        if (tempDevice != null) {
+          _setupConnectedDevice(tempDevice);
+        }
         // if connected, cancel scans
         CustomLogger.d("BLE disconnect timer cancelled on connection");
       } else if (event.connectionState ==
@@ -208,29 +212,9 @@ class BluetoothTaskHandler extends TaskHandler {
                 .connectAndUpdateStream(); // without wait, to not block subsequent code
           });
         }
-        if (FlutterBluePlus.connectedDevices.isNotEmpty) {
-          await _setupConnectedDevice(await _findNearestDevice());
+        if (tempDevice != null) {
+          _setupConnectedDevice(tempDevice);
         }
-        CustomLogger.d("Trip cancel timer cancelled");
-        // cancel the trip if bluetooth connection is lost for more than 10 seconds
-        Future.delayed(const Duration(seconds: 10), () async {
-          CustomLogger.d(
-              "Waiting 15 seconds to check if device is still disconnected");
-          if (event.connectionState == BluetoothConnectionState.disconnected) {
-            if (_elm327Controller?.deviceId == event.device.remoteId.str) {
-              CustomLogger.w(
-                  "Connection to ELM327 lost for more than 10 seconds");
-              if (_elm327Controller!.isTripInProgress) {
-                CustomLogger.w("cancelling trip and resetting ELM327");
-                await _diposeElmController();
-              }
-            }
-          } else {
-            CustomLogger.i("Device is connected again, cancelling timer");
-            return;
-            // if a trip is in progress, but the bluetooth connection got interrupted for a short time, return.
-          }
-        });
       }
     });
 
@@ -274,7 +258,11 @@ class BluetoothTaskHandler extends TaskHandler {
   }
 
   // return the device with the best signal strength
-  Future<BluetoothDevice> _findNearestDevice() async {
+  Future<BluetoothDevice?> _findNearestDevice() async {
+    if (FlutterBluePlus.connectedDevices.isEmpty) {
+      CustomLogger.d("No connected devices");
+      return null;
+    }
     final devices = FlutterBluePlus.connectedDevices;
     if (devices.length == 1) {
       return devices.first;
@@ -349,6 +337,15 @@ class BluetoothTaskHandler extends TaskHandler {
   }
 
   Future<void> _setupConnectedDevice(BluetoothDevice device) async {
+    if (_elm327Controller?.isTripInProgress == true) {
+      // if a trip is in progress, don't set up a new connected device
+      CustomLogger.d("Trip in progress, not setting up new connected device");
+      return;
+    } else if (_elm327Controller?.isTripInProgress == false) {
+      // if no trip is in progress, dispose the controller, to start a new one
+      _diposeElmController();
+    }
+
     CustomLogger.d("Setting up connected device: ${device.remoteId.str}");
     await _requestMtu(device);
     await _discoverCharacteristicsAndStartElm327(device);
