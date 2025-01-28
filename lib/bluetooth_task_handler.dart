@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:driver_logbook/controllers/trip_controller.dart';
 import 'package:driver_logbook/objectbox.dart';
 import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:driver_logbook/utils/extra.dart';
@@ -379,8 +380,9 @@ class BluetoothTaskHandler extends TaskHandler {
     }
     knownRemoteIds = _prefs.getStringList("knownRemoteIds") ?? [];
     CustomLogger.d('Initialized knownRemoteIds');
-    // CustomLogger.d('Initialized TripController');
-    CustomLogger.d('Initialized GpsService');
+    await TripController.initialize();
+    CustomLogger.d('Initialized TripController');
+    // CustomLogger.d('Initialized GpsService');
     await VehicleUtils.initializeVehicleModels();
     CustomLogger.d('Initialized VehicleModels');
   }

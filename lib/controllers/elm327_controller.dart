@@ -19,7 +19,7 @@ class Elm327Controller {
   final BluetoothCharacteristic _notifyCharacteristic;
   bool _isInitialized = false;
   // just a getter for task handler and to simplify the code
-  bool get isTripInProgress => _tripController?.currentTrip != null;
+  bool get isTripInProgress => TripController().currentTrip != null;
   // telemetry-related:
   String? _vehicleVin; // used for saving the vin
   int? _vehicleMileage; // used for saving and tracking the mileage
@@ -36,8 +36,6 @@ class Elm327Controller {
   Timer?
       _mileageSendCommandTimer; // used for sending mileage requests continuously
   String _responseBuffer = ''; // buffer for incoming data from the elm327
-  final TripController? _tripController; // controller for managing trips
-  final GpsService? _gpsService; // used for getting the location
 
   Elm327Controller({
     required BluetoothDevice device,
@@ -45,9 +43,7 @@ class Elm327Controller {
     required BluetoothCharacteristic notifyCharacteristic,
   })  : _device = device,
         _notifyCharacteristic = notifyCharacteristic,
-        _writeCharacteristic = writeCharacteristic,
-        _tripController = TripController(),
-        _gpsService = GpsService();
+        _writeCharacteristic = writeCharacteristic;
 
   Future<bool> initialize() async {
     if (_isInitialized) {
@@ -125,19 +121,24 @@ class Elm327Controller {
       // flag to prevent race conditions
       CustomLogger.w("Trip already running, not starting a new one");
       CustomLogger.w(
-          "Variables - Trip in Progress: $isTripInProgress, current trip: ${_tripController?.currentTrip}");
+          "Variables - Trip in Progress: $isTripInProgress, current trip: ${TripController().currentTrip}");
       return;
     }
     // if no trip is running, start a new one
-    if (_tripController!.currentTrip == null) {
+    if (TripController().currentTrip == null) {
       try {
         // get location
-        final position =
-            await _gpsService!.currentPosition ?? _gpsService.lastKnownPosition;
+        final position = await GpsService().currentPosition;
         CustomLogger.d("Current position: $position");
-        _tempLocation = await _gpsService.getLocationFromPosition(position);
+        _tempLocation = await GpsService().getLocationFromPosition(position);
         if (_tempLocation == null || _tempLocation?.street == 'not found') {
           CustomLogger.w("Location not found");
+          final lastKnownPosition = await GpsService().lastKnownPosition;
+          if (lastKnownPosition != null) {
+            _tempLocation =
+                await GpsService().getLocationFromPosition(lastKnownPosition);
+          }
+          CustomLogger.d("Last known position: $lastKnownPosition");
         }
         CustomLogger.d("Location found: $_tempLocation");
         if (_vehicleVin != null) {
@@ -145,16 +146,17 @@ class Elm327Controller {
           _tempVehicle = Vehicle.fromVin(_vehicleVin!);
         }
         // finally start a trip
-        _tripController.startTrip(_vehicleMileage, _tempVehicle, _tempLocation);
+        TripController()
+            .startTrip(_vehicleMileage, _tempVehicle, _tempLocation);
       } catch (e) {
         // any error here that prevents the trip from starting
         CustomLogger.e("Error in starting trip: $e");
       }
 
-      if (_tripController.currentTrip != null) {
+      if (TripController().currentTrip != null) {
         // if a trip is started, log it
         CustomLogger.i(
-            "Started trip with: ${jsonEncode(_tripController.currentTrip!.toJson())}");
+            "Started trip with: ${jsonEncode(TripController().currentTrip!.toJson())}");
         // CustomLogger.i(_tripController!.currentTrip!.toJson());
         CustomLogger.i("Fahrtaufzeichnung hat begonnen");
         _updateForegroundNotificationText(
@@ -175,16 +177,24 @@ class Elm327Controller {
     if (!isTripInProgress) {
       CustomLogger.w("No trip to end");
       CustomLogger.d(
-          "Variables - Trip in Progress: $isTripInProgress, current trip: ${_tripController?.currentTrip}");
+          "Variables - Trip in Progress: $isTripInProgress, current trip: ${TripController().currentTrip}");
       return;
     }
     try {
-      final endPosition =
-          await _gpsService!.currentPosition ?? _gpsService.lastKnownPosition;
+      final endPosition = await GpsService().currentPosition;
       CustomLogger.d("End position: $endPosition");
-      _tempLocation = await _gpsService.getLocationFromPosition(endPosition);
+      _tempLocation = await GpsService().getLocationFromPosition(endPosition);
+      if (_tempLocation == null || _tempLocation?.street == 'not found') {
+        CustomLogger.w("End location not found");
+        final lastKnownPosition = await GpsService().lastKnownPosition;
+        if (lastKnownPosition != null) {
+          _tempLocation =
+              await GpsService().getLocationFromPosition(lastKnownPosition);
+        }
+        CustomLogger.d("Last known position: $lastKnownPosition");
+      }
       CustomLogger.d("New Location found: $_tempLocation");
-      _tripController!.endTrip(_tempLocation, _vehicleMileage);
+      TripController().endTrip(_tempLocation, _vehicleMileage);
     } catch (e) {
       CustomLogger.e("Error in _endTrip: $e");
     }

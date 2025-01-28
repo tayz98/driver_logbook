@@ -5,10 +5,13 @@ import 'package:geocoding/geocoding.dart';
 import 'package:driver_logbook/models/trip_location.dart';
 
 class GpsService {
-  static final GpsService _singleton = GpsService._internal();
-  factory GpsService() => _singleton;
-  get currentPosition async => await Geolocator.getCurrentPosition();
-  get lastKnownPosition async => await Geolocator.getLastKnownPosition();
+  static final GpsService _instance = GpsService._internal();
+  factory GpsService() => _instance;
+
+  Future<Position> get currentPosition async =>
+      await Geolocator.getCurrentPosition();
+  Future<Position?> get lastKnownPosition async =>
+      await Geolocator.getLastKnownPosition();
 
   late LocationSettings _locationSettings;
   LocationSettings get locationSettings => _locationSettings;
