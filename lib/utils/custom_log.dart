@@ -22,19 +22,13 @@ class CustomLogger {
     // Print to console (via logger)
     _logger.log(level, message);
 
-    String serializedMessage;
-    if (message is Map<String, dynamic>) {
-      serializedMessage = jsonEncode(message);
-    } else {
-      serializedMessage = message;
-    }
-
     // Send the log to your server
     HttpService().post(
       type: ServiceType.log,
       body: {
         'level': level.toString(),
-        'message': serializedMessage,
+        'message':
+            message is Map<String, dynamic> ? jsonEncode(message) : message,
         'timestamp': DateTime.now().toIso8601String(),
       },
     );
