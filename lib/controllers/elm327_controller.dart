@@ -374,6 +374,12 @@ class Elm327Controller {
     _voltageTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       CustomLogger.d("Calling _voltageTimer");
       try {
+        if (_device.isDisconnected) {
+          CustomLogger.w("Device is not connected, can't check voltage");
+          _voltageTimer?.cancel();
+          _voltageTimer = null;
+          return;
+        }
         await sendCommand(voltageCommand);
       } catch (e) {
         CustomLogger.e("Error in _voltageTimer: $e");
@@ -388,6 +394,10 @@ class Elm327Controller {
     }
     const int maxTries = 10;
     try {
+      if (_device.isDisconnected) {
+        CustomLogger.w("Device is not connected, can't request VIN");
+        return false;
+      }
       if (_vehicleVin == null) {
         CustomLogger.d("Sending VIN request");
         for (int i = 0; i < maxTries; i++) {
@@ -423,6 +433,12 @@ class Elm327Controller {
         Timer.periodic(const Duration(seconds: 3), (_) async {
       CustomLogger.d("Calling _mileageSendCommandTimer");
       try {
+        if (_device.isDisconnected) {
+          CustomLogger.w("Device is not connected, can't request mileage");
+          _mileageSendCommandTimer?.cancel();
+          _mileageSendCommandTimer = null;
+          return;
+        }
         await sendCommand(VehicleUtils.getVehicleMileageCommand(_vehicleVin!));
       } catch (e) {
         CustomLogger.e("Error in sending mileage command: $e");
