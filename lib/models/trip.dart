@@ -51,8 +51,6 @@ class Trip {
         endMileage != null &&
         startLocationJson != null &&
         endLocationJson != null &&
-        startLocationJson != "null" &&
-        endLocationJson != "null" &&
         vehicleJson != null;
   }
 

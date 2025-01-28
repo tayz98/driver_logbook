@@ -26,7 +26,6 @@ class Elm327Controller {
   double?
       _voltageVal; // used for checking voltage of the vehicle (engine runnning)
   TripLocation? _tempLocation;
-  Vehicle? _tempVehicle;
   final String vinCommand =
       "0902"; // standardized obd2 command for requesting the vin
   final String voltageCommand =
@@ -46,6 +45,7 @@ class Elm327Controller {
         _writeCharacteristic = writeCharacteristic;
 
   Future<bool> initialize() async {
+    _responseBuffer = '';
     if (_isInitialized) {
       CustomLogger.w("ELM327 already initialized");
       return true;
@@ -59,9 +59,8 @@ class Elm327Controller {
       List<String> initCommands = [
         // "ATZ", // Reset ELM327
         // "ATD", // reset defaults
-        // TODO: maybe ATSP0 is not needed
-        "ATSP0", // Set Protocol to Automatic
-        "ATE0", // Echo Off
+        // "ATSP0", // Set Protocol to Automatic
+        //"ATE0", // Echo Off
         // "ATL0", // Linefeeds Off
         // "ATS0", // Spaces Off
         "ATH1", // Headers On
@@ -105,7 +104,6 @@ class Elm327Controller {
     _vehicleMileage = null;
     _voltageVal = null;
     _tempLocation = null;
-    _tempVehicle = null;
     _responseBuffer = '';
     _voltageTimer?.cancel();
     _tripTimeoutTimer?.cancel();
@@ -138,16 +136,15 @@ class Elm327Controller {
             _tempLocation =
                 await GpsService().getLocationFromPosition(lastKnownPosition);
           }
-          CustomLogger.d("Last known position: $lastKnownPosition");
+          // CustomLogger.d("Last known position: $lastKnownPosition");
         }
-        CustomLogger.d("Location found: $_tempLocation");
-        if (_vehicleVin != null) {
-          // create a vehicle with informations from the VIN
-          _tempVehicle = Vehicle.fromVin(_vehicleVin!);
-        }
+        // CustomLogger.d("Location found: $_tempLocation");
         // finally start a trip
-        TripController()
-            .startTrip(_vehicleMileage, _tempVehicle, _tempLocation);
+        if (_tempLocation != null) {
+          TripController().startTrip(startLocation: _tempLocation);
+        } else {
+          TripController().startTrip();
+        }
       } catch (e) {
         // any error here that prevents the trip from starting
         CustomLogger.e("Error in starting trip: $e");
@@ -155,10 +152,8 @@ class Elm327Controller {
 
       if (TripController().currentTrip != null) {
         // if a trip is started, log it
-        CustomLogger.i(
-            "Started trip with: ${jsonEncode(TripController().currentTrip!.toJson())}");
         // CustomLogger.i(_tripController!.currentTrip!.toJson());
-        CustomLogger.i("Fahrtaufzeichnung hat begonnen");
+        CustomLogger.i("Trip started");
         _updateForegroundNotificationText(
             "Fahrtaufzeichnung", "Die Fahrt hat begonnen");
       }
@@ -194,7 +189,16 @@ class Elm327Controller {
         CustomLogger.d("Last known position: $lastKnownPosition");
       }
       CustomLogger.d("New Location found: $_tempLocation");
-      TripController().endTrip(_tempLocation, _vehicleMileage);
+      if (_tempLocation != null && _vehicleMileage != null) {
+        TripController()
+            .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
+      } else if (_tempLocation != null) {
+        TripController().endTrip(endLocation: _tempLocation);
+      } else if (_vehicleMileage != null) {
+        TripController().endTrip(mileage: _vehicleMileage);
+      } else {
+        TripController().endTrip();
+      }
     } catch (e) {
       CustomLogger.e("Error in _endTrip: $e");
     }
@@ -230,13 +234,14 @@ class Elm327Controller {
   void handleReceivedData(List<int> data) {
     // decode it and add it to the buffer because responses can be split into multiple parts
     String incomingData = utf8.decode(data);
-    // CustomLogger.d("Incoming data: $incomingData");
+    CustomLogger.d("Incoming data: $incomingData");
     _responseBuffer += incomingData;
+
     int endIndex = _responseBuffer.indexOf(">"); // ">" is the end of a response
     while (endIndex != -1) {
       String completeResponse = _responseBuffer.substring(0, endIndex).trim();
       _responseBuffer = _responseBuffer.substring(endIndex + 1);
-      // CustomLogger.d("Complete response: $completeResponse");
+      CustomLogger.d("Complete response: $completeResponse");
       _processCompleteResponse(completeResponse);
       endIndex = _responseBuffer.indexOf(">");
     }
@@ -275,28 +280,34 @@ class Elm327Controller {
 
     if (cleanedResponse.isEmpty) return; // unsolicited response, ignore it
 
-    if (cleanedResponse.contains("V")) {
-      await _handleResponseToVoltCommand(response);
+    // ATRV: check voltage
+    if (cleanedResponse.contains("ATRV")) {
+      cleanedResponse = cleanedResponse.replaceFirst("ATRV", "");
+      await _handleResponseToVoltCommand(cleanedResponse);
     }
-    if (cleanedResponse.contains("6210")) {
-      // startsWith doesn't work for some reason, that's why contains is used
-      // update: should be working by now, but doesn't matter right now
-      await _handleResponseToMileageCommand(cleanedResponse);
+    // 0902: VIN command
+    if (cleanedResponse.contains(vinCommand)) {
+      cleanedResponse = cleanedResponse.replaceFirst(vinCommand, "");
+      _handleResponseToVinCommand(cleanedResponse);
     }
 
-    // 7E8 is the device id, 10 is the FF,
-    //14 is the length of the response (20 bytes),
-    //49 is the answer to the mode 09
-    if (cleanedResponse.contains("7E8101449")) {
-      // startsWith doesn't work here too
-      // update: should be working by now, but doesn't matter right now
-      _handleResponseToVinCommand(cleanedResponse);
+    // mileage command
+    if (cleanedResponse
+        .contains(VehicleUtils.getVehicleMileageCommand(_vehicleVin!))) {
+      cleanedResponse = cleanedResponse.replaceFirst(
+          VehicleUtils.getVehicleMileageCommand(_vehicleVin!), "");
+      await _handleResponseToMileageCommand(cleanedResponse);
     }
   }
 
   Future<void> _handleResponseToVoltCommand(String response) async {
+    CustomLogger.d("Voltage response: $response");
     CustomLogger.d("Voltage command response");
+    if (response.contains("ATRV")) {
+      response = response.replaceAll("ATRV", "");
+    }
     final parts = response.split("V");
+
     if (parts.isNotEmpty) {
       final voltageString = parts.first;
       final voltageIntValue = int.tryParse(voltageString);
@@ -336,19 +347,24 @@ class Elm327Controller {
 
   Future<void> _handleResponseToMileageCommand(String response) async {
     CustomLogger.d("Handling mileage response");
-
     final mileage = VehicleUtils.getVehicleKm(_vehicleVin!, response);
     CustomLogger.i("Mileage response: $mileage");
     final isMileageValid = _checkMileage(mileage);
 
     if (isMileageValid) {
+      if (isTripInProgress &&
+          TripController().currentTrip?.startMileage == null) {
+        TripController().updateTripStartMileage(mileage);
+      }
       _tripTimeoutTimer?.cancel();
+      _tripTimeoutTimer = null;
       CustomLogger.d("Trip timeout timer cancelled");
       _vehicleMileage = mileage;
       CustomLogger.d("Trip timeout timer called");
       _tripTimeoutTimer = Timer(const Duration(seconds: 10), () async {
         CustomLogger.d("Trip timeout has lapsed");
         _mileageSendCommandTimer?.cancel();
+        _mileageSendCommandTimer = null;
         if (isTripInProgress) {
           CustomLogger.i("Trip timeout, ending trip...");
           try {
@@ -387,7 +403,9 @@ class Elm327Controller {
     });
   }
 
+  // request VIN from the vehicle
   Future<bool> _requestVin() async {
+    CustomLogger.d("Requesting VIN");
     if (_voltageVal == null) {
       CustomLogger.fatal("Voltage is null, can't request VIN");
       return false;
@@ -398,24 +416,30 @@ class Elm327Controller {
         CustomLogger.w("Device is not connected, can't request VIN");
         return false;
       }
-      if (_vehicleVin == null) {
-        CustomLogger.d("Sending VIN request");
-        for (int i = 0; i < maxTries; i++) {
-          final success = await sendCommand(vinCommand);
-          if (!success) {
-            CustomLogger.w("Failed to send VIN command");
-          }
-          if (_vehicleVin != null) {
-            CustomLogger.i("VIN set after $i tries");
-            break;
-          }
-        }
-        if (_vehicleVin == null) {
-          CustomLogger.fatal("VIN not set after $maxTries tries");
-          return false;
+
+      CustomLogger.d("Sending VIN request");
+      for (int i = 0; i < maxTries; i++) {
+        final success = await sendCommand(vinCommand);
+        if (!success) {
+          CustomLogger.w("Failed to send VIN command");
         } else {
-          CustomLogger.d("VIN: $_vehicleVin");
+          CustomLogger.d("VIN command sent");
         }
+
+        await Future.delayed(
+            const Duration(seconds: 2)); // small delay between requests
+        if (_vehicleVin != null) {
+          // checking if VIN was set
+          CustomLogger.i("VIN set after $i tries");
+          break;
+        }
+      }
+
+      if (_vehicleVin == null) {
+        CustomLogger.fatal("VIN not set after $maxTries tries");
+        return false;
+      } else {
+        CustomLogger.d("VIN: $_vehicleVin");
       }
     } catch (e) {
       CustomLogger.fatal("Error in requesting VIN: $e");
@@ -454,9 +478,11 @@ class Elm327Controller {
     }
     CustomLogger.i("Starting telemetry collection");
     await _startTrip();
+    CustomLogger.i("Trip start completed");
     final isVinSet = await _requestVin();
     if (isVinSet) {
       // VIN is a required field for requesting mileage (see vehicle_utils.dart)
+      TripController().updateTripVehicle(Vehicle.fromVin(_vehicleVin!));
       CustomLogger.d("VIN is set, starting mileage request");
       await _startRequestingMileage();
     } else {

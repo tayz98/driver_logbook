@@ -23,20 +23,42 @@ class TripController {
     return _instance;
   }
 
-  void startTrip(int? mileage, Vehicle? vehicle, TripLocation? startLocation) {
+  void startTrip({TripLocation? startLocation}) {
     _instance._prefs.reload();
     _currentTrip = Trip(
-      startMileage: mileage,
-      vehicleJson: jsonEncode(vehicle?.toJson()),
       tripCategory: TripCategory
           .values[_instance._prefs.getInt('tripCategory2') ?? 0]
           .toString(),
       tripStatus: TripStatus.inProgress.toString(),
-      startLocationJson: jsonEncode(startLocation?.toJson()),
+      startLocationJson:
+          startLocation == null ? null : jsonEncode(startLocation.toJson()),
     );
+    CustomLogger.i('Trip ended: ${jsonEncode(_currentTrip!.toJson())}');
   }
 
-  void endTrip(TripLocation? endLocation, int? mileage) {
+  void updateTripStartMileage(int? mileage) {
+    if (_currentTrip == null) {
+      CustomLogger.e("Trip not found");
+      throw Exception('Trip not found');
+    }
+    _currentTrip!.startMileage = mileage;
+    CustomLogger.i('Added start mileage to trip: $mileage');
+  }
+
+  void updateTripVehicle(Vehicle? vehicle) {
+    if (_currentTrip == null) {
+      CustomLogger.e("Trip not found");
+      throw Exception('Trip not found');
+    }
+    if (vehicle == null) {
+      CustomLogger.e("Vehicle is null, cannot update trip");
+      return; // Prevent null assignment
+    }
+    _currentTrip!.vehicleJson = jsonEncode(vehicle.toJson());
+    CustomLogger.i('Added Vehicle to trip: ${jsonEncode(vehicle.toJson())}');
+  }
+
+  void endTrip({TripLocation? endLocation, int? mileage}) {
     if (_currentTrip == null) {
       CustomLogger.e("Trip not found");
       throw Exception('Trip not found');
@@ -47,13 +69,17 @@ class TripController {
     if (endLocation != null) {
       _currentTrip!.endLocationJson = jsonEncode(endLocation.toJson());
     }
-    _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
-    final status = _currentTrip!.isTripCompleted()
-        ? TripStatus.completed
-        : TripStatus.incorrect;
-    _currentTrip!.tripStatus = status.toString();
-    CustomLogger.i('Trip ended: ${jsonEncode(_currentTrip!.toJson())}');
-    TripRepository.saveTrip(_currentTrip!);
+    try {
+      _currentTrip!.endTimestamp = DateTime.now().toIso8601String();
+      final status = _currentTrip!.isTripCompleted()
+          ? TripStatus.completed
+          : TripStatus.incorrect;
+      _currentTrip!.tripStatus = status.toString();
+      CustomLogger.i('Trip ended: ${jsonEncode(_currentTrip!.toJson())}');
+      TripRepository.saveTrip(_currentTrip!);
+    } catch (e) {
+      CustomLogger.e('Error while ending trip: $e');
+    }
     _currentTrip = null;
   }
 }

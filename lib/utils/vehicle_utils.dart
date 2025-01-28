@@ -83,6 +83,7 @@ class VehicleUtils {
     }
   }
 
+  // Approach with Headers enabled
   static String getVehicleVin(String response) {
     // Step 1: Remove "7E8" and spaces if present
     String cleanedInput = response.replaceAll("7E8", "").replaceAll(" ", "");

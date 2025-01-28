@@ -202,16 +202,21 @@ class BluetoothTaskHandler extends TaskHandler {
         }
         // if connected, cancel scans
         CustomLogger.d("BLE disconnect timer cancelled on connection");
+        // TODO: check if this works
       } else if (event.connectionState ==
           BluetoothConnectionState.disconnected) {
-        // thinking.. if a device disconnected, check if previously connected devices can be reconnected
+        Future.delayed(const Duration(seconds: 5), () async {
+          if (event.device.remoteId == _elm327Controller?.deviceId &&
+              event.device.isDisconnected) {
+            await _diposeElmController();
+          }
+        });
+
         if (!event.device.isAutoConnectEnabled) {
           // if auto connect is disabled by disconnecting, enable it again
           // this usually shouldn't happen, but for safety reasons we check it
-          Future.delayed(const Duration(seconds: 3), () {
-            event.device
-                .connectAndUpdateStream(); // without wait, to not block subsequent code
-          });
+          event.device.connectAndUpdateStream();
+          CustomLogger.d("Auto connect enabled again");
         }
         if (tempDevice != null) {
           _setupConnectedDevice(tempDevice);
