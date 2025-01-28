@@ -29,7 +29,7 @@ void initForegroundService() {
       playSound: false,
     ),
     foregroundTaskOptions: ForegroundTaskOptions(
-      eventAction: ForegroundTaskEventAction.repeat(10000),
+      eventAction: ForegroundTaskEventAction.repeat(20000),
       autoRunOnBoot: true,
       autoRunOnMyPackageReplaced: true,
       allowWakeLock: true,
@@ -70,6 +70,8 @@ List<String> foundDeviceIds = [];
 
 // app flags
 bool privateTripsAllowed = false;
+
+bool permissionGrantedForThisSession = false;
 
 // system permissions
 final List<Permission> permissions = [
@@ -123,6 +125,7 @@ Future<void> requestAllPermissions(BuildContext context) async {
     if (context.mounted) _showPermissionsDeniedDialog(context);
   } finally {
     if (allGranted) {
+      permissionGrantedForThisSession = true;
       SharedPreferences.getInstance().then((prefs) {
         // remember permission state
         prefs.setBool('arePermissionsGranted', allGranted);

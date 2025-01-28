@@ -44,11 +44,13 @@ class HomeState extends State<Home> {
       }
       initForegroundService();
       // start the background service automatically on startup
-      if (await FlutterForegroundTask.isRunningService == false && areGranted) {
+      if (await FlutterForegroundTask.isRunningService == false &&
+          (areGranted || permissionGrantedForThisSession)) {
         await startBluetoothService();
       }
       // Check if service is running and set the state accordingly
-      if (await FlutterForegroundTask.isRunningService && areGranted) {}
+      if (await FlutterForegroundTask.isRunningService &&
+          (areGranted || permissionGrantedForThisSession)) {}
     });
     _startListeningToChangesAndRedirectToTask();
   }
