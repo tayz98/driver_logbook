@@ -124,8 +124,8 @@ class IosElm327Controller {
     }
     // if no trip is running, start a new one
     if (TripController().currentTrip == null) {
+      // get location
       try {
-        // get location
         final position = await GpsService().currentPosition;
         CustomLogger.d("Current position: $position");
         _tempLocation = await GpsService().getLocationFromPosition(position);
@@ -138,16 +138,16 @@ class IosElm327Controller {
           }
           // CustomLogger.d("Last known position: $lastKnownPosition");
         }
-        // CustomLogger.d("Location found: $_tempLocation");
-        // finally start a trip
-        if (_tempLocation != null) {
-          TripController().startTrip(startLocation: _tempLocation);
-        } else {
-          TripController().startTrip();
-        }
       } catch (e) {
-        // any error here that prevents the trip from starting
-        CustomLogger.e("Error in starting trip: $e");
+        CustomLogger.e(
+            "Error in getting location, starting trip without it: $e");
+      }
+      // CustomLogger.d("Location found: $_tempLocation");
+      // finally start a trip
+      if (_tempLocation != null) {
+        TripController().startTrip(startLocation: _tempLocation);
+      } else {
+        TripController().startTrip();
       }
 
       if (TripController().currentTrip != null) {

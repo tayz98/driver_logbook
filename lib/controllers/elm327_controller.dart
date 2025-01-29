@@ -124,30 +124,26 @@ class Elm327Controller {
     }
     // if no trip is running, start a new one
     if (TripController().currentTrip == null) {
-      try {
-        // get location
-        final position = await GpsService().currentPosition;
-        CustomLogger.d("Current position: $position");
-        _tempLocation = await GpsService().getLocationFromPosition(position);
-        if (_tempLocation == null || _tempLocation?.street == 'not found') {
-          CustomLogger.w("Location not found");
-          final lastKnownPosition = await GpsService().lastKnownPosition;
-          if (lastKnownPosition != null) {
-            _tempLocation =
-                await GpsService().getLocationFromPosition(lastKnownPosition);
-          }
-          // CustomLogger.d("Last known position: $lastKnownPosition");
+      // get location
+// TODO: try catch more specific
+      final position = await GpsService().currentPosition;
+      CustomLogger.d("Current position: $position");
+      _tempLocation = await GpsService().getLocationFromPosition(position);
+      if (_tempLocation == null || _tempLocation?.street == 'not found') {
+        CustomLogger.w("Location not found");
+        final lastKnownPosition = await GpsService().lastKnownPosition;
+        if (lastKnownPosition != null) {
+          _tempLocation =
+              await GpsService().getLocationFromPosition(lastKnownPosition);
         }
-        // CustomLogger.d("Location found: $_tempLocation");
-        // finally start a trip
-        if (_tempLocation != null) {
-          TripController().startTrip(startLocation: _tempLocation);
-        } else {
-          TripController().startTrip();
-        }
-      } catch (e) {
-        // any error here that prevents the trip from starting
-        CustomLogger.e("Error in starting trip: $e");
+        // CustomLogger.d("Last known position: $lastKnownPosition");
+      }
+      // CustomLogger.d("Location found: $_tempLocation");
+      // finally start a trip
+      if (_tempLocation != null) {
+        TripController().startTrip(startLocation: _tempLocation);
+      } else {
+        TripController().startTrip();
       }
 
       if (TripController().currentTrip != null) {
