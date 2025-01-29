@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:driver_logbook/controllers/elm327_controller.dart';
+import 'package:driver_logbook/controllers/ios_elm327_controller.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/utils/extra.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
@@ -21,7 +21,7 @@ class IosBluetoothService {
   late String targetName; // target name for scanning
   List<String> knownRemoteIds = []; // list of known remote ids to connect to
   late SharedPreferences _prefs; // used for storing persistent data
-  Elm327Controller?
+  IosElm327Controller?
       _elm327Controller; // elm327 controller for handling elm327 commands
 
   IosBluetoothService._internal() {
@@ -214,7 +214,7 @@ class IosBluetoothService {
     }
 
     if (writeCharacteristic != null && notifyCharacteristic != null) {
-      _elm327Controller = Elm327Controller(
+      _elm327Controller = IosElm327Controller(
           writeCharacteristic: writeCharacteristic,
           notifyCharacteristic: notifyCharacteristic,
           device: device);
