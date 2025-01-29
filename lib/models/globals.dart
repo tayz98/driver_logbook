@@ -4,6 +4,7 @@ import 'package:driver_logbook/bluetooth_task_handler.dart';
 import 'package:driver_logbook/notification_configuration.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -110,6 +111,14 @@ Future<void> requestAllPermissions(BuildContext context) async {
     if (Platform.isAndroid || Platform.isIOS) {
       final bool notificationGranted = await checkNotificationPermission();
       if (!notificationGranted) {
+        allGranted = false;
+      }
+    }
+
+    LocationPermission locationPermission = await Geolocator.checkPermission();
+    if (locationPermission == LocationPermission.denied) {
+      locationPermission = await Geolocator.requestPermission();
+      if (locationPermission == LocationPermission.denied) {
         allGranted = false;
       }
     }

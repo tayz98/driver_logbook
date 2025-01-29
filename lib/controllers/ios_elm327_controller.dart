@@ -187,20 +187,19 @@ class IosElm327Controller {
               await GpsService().getLocationFromPosition(lastKnownPosition);
         }
         CustomLogger.d("Last known position: $lastKnownPosition");
+        if (_vehicleMileage == null) {
+          TripController()
+              .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
+        } else {
+          TripController().endTrip(endLocation: _tempLocation);
+        }
       }
-      CustomLogger.d("New Location found: $_tempLocation");
-      if (_tempLocation != null && _vehicleMileage != null) {
-        TripController()
-            .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
-      } else if (_tempLocation != null) {
-        TripController().endTrip(endLocation: _tempLocation);
-      } else if (_vehicleMileage != null) {
+    } catch (e) {
+      if (_vehicleMileage == null) {
         TripController().endTrip(mileage: _vehicleMileage);
       } else {
         TripController().endTrip();
       }
-    } catch (e) {
-      CustomLogger.e("Error in _endTrip: $e");
     }
     CustomLogger.d("Cancelled all Timers on trip end");
     _updateForegroundNotificationText(
