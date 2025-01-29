@@ -39,8 +39,8 @@ class GpsService {
       _locationSettings = AppleSettings(
           accuracy: LocationAccuracy.medium,
           activityType: ActivityType.automotiveNavigation,
-          distanceFilter: 250,
-          timeLimit: const Duration(seconds: 4),
+          distanceFilter: 0,
+          // timeLimit: const Duration(seconds: 4),
           pauseLocationUpdatesAutomatically: false,
           showBackgroundLocationIndicator: true,
           allowBackgroundLocationUpdates: true);
