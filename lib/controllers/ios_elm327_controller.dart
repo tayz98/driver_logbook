@@ -136,19 +136,19 @@ class IosElm327Controller {
             _tempLocation =
                 await GpsService().getLocationFromPosition(lastKnownPosition);
           }
+          TripController().startTrip(startLocation: _tempLocation);
+
           // CustomLogger.d("Last known position: $lastKnownPosition");
         }
       } catch (e) {
         CustomLogger.e(
             "Error in getting location, starting trip without it: $e");
+        TripController().startTrip();
       }
       // CustomLogger.d("Location found: $_tempLocation");
       // finally start a trip
       if (_tempLocation != null) {
-        TripController().startTrip(startLocation: _tempLocation);
-      } else {
-        TripController().startTrip();
-      }
+      } else {}
 
       if (TripController().currentTrip != null) {
         // if a trip is started, log it
