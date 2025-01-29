@@ -27,7 +27,7 @@ class SettingsState extends State<Settings> {
 
   @override
   void initState() {
-    super.initState();
+    super.initState();q
     checkService();
   }
 
