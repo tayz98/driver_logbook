@@ -28,6 +28,10 @@ class IosBluetoothService {
     _initialize();
   }
   void _initialize() async {
+    await FlutterBluePlus.adapterState
+        .where((val) => val == BluetoothAdapterState.on)
+        .first;
+
     targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
     targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
     CustomLogger.d('IOS: Initialized dotenv');

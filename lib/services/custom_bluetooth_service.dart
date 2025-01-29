@@ -22,6 +22,10 @@ class CustomBluetoothService {
   }
 
   Future<void> _initialize() async {
+    await FlutterBluePlus.adapterState
+        .where((val) => val == BluetoothAdapterState.on)
+        .first;
+
     _scanResultsSubscription ??= FlutterBluePlus.scanResults.listen((results) {
       _scanResults = results;
     });
