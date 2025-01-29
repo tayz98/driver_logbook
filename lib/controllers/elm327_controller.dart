@@ -303,8 +303,8 @@ class Elm327Controller {
   Future<void> _handleResponseToVoltCommand(String response) async {
     CustomLogger.d("Voltage response: $response");
     CustomLogger.d("Voltage command response");
-    if (response.contains("ATRV")) {
-      response = response.replaceAll("ATRV", "");
+    while (response.startsWith("ATRV")) {
+      response = response.substring("ATRV".length).trim();
     }
     final parts = response.split("V");
 
