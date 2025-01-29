@@ -38,7 +38,17 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # Flutter settings
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+  end
+
+  # Custom settings for geolocator_apple
+  installer.pods_project.targets.each do |target|
+    if target.name == "geolocator_apple"
+      target.build_configurations.each do |config|
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)', 'BYPASS_PERMISSION_LOCATION_ALWAYS=1']
+      end
+    end
   end
 end

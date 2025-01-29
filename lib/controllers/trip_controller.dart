@@ -33,7 +33,7 @@ class TripController {
       startLocationJson:
           startLocation == null ? null : jsonEncode(startLocation.toJson()),
     );
-    CustomLogger.i('Trip ended: ${jsonEncode(_currentTrip!.toJson())}');
+    CustomLogger.i('Trip started: ${jsonEncode(_currentTrip!.toJson())}');
   }
 
   void updateTripStartMileage(int? mileage) {
