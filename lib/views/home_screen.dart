@@ -73,6 +73,10 @@ class HomeState extends State<Home> {
 
   // sends index of category or remoteIds of BT-Devices to the service
   void _startListeningToChangesAndRedirectToTask() {
+    if (Platform.isIOS) {
+      CustomLogger.d('iOS not working with foreground service');
+      return;
+    }
     _userDataStreamController.stream.listen((data) async {
       if (_prefs!.getBool('arePermissionsGranted') == false) {
         if (mounted) {
@@ -165,7 +169,8 @@ class HomeState extends State<Home> {
                 initialMode:
                     TripCategory.values[_prefs?.getInt('tripCategory2') ?? 0],
                 onModeChanged: (newMode) async {
-                  if (false == await FlutterForegroundTask.isRunningService) {
+                  if (false == await FlutterForegroundTask.isRunningService &&
+                      Platform.isAndroid) {
                     if (context.mounted) {
                       _showServiceNotRunningError(context);
                     }
@@ -175,7 +180,9 @@ class HomeState extends State<Home> {
                     _newModeIndex = newMode.index;
                   });
                   _prefs?.setInt('tripCategory2', _newModeIndex!) ?? 0;
-                  _userDataStreamController.add(_newModeIndex);
+                  if (Platform.isAndroid) {
+                    _userDataStreamController.add(_newModeIndex);
+                  }
                 },
               ),
             ],

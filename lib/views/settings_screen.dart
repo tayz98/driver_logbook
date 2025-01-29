@@ -1,4 +1,6 @@
+import 'dart:io';
 
+import 'package:driver_logbook/services/ios_bluetooth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:driver_logbook/widgets/button_template.dart';
 import 'package:driver_logbook/models/globals.dart';
@@ -29,6 +31,10 @@ class SettingsState extends State<Settings> {
     checkService();
   }
 
+  void startIosBluetoothService() {
+    IosBluetoothService();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,16 +62,21 @@ class SettingsState extends State<Settings> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                CustomButton(
-                    label: "Dienst starten",
-                    onPressed: _isServiceRunning == false
-                        ? () async {
-                            setState(() {
-                              _isServiceRunning = true;
-                            });
-                            await startBluetoothService();
-                          }
-                        : null),
+                if (Platform.isAndroid)
+                  CustomButton(
+                      label: "Dienst starten",
+                      onPressed: _isServiceRunning == false
+                          ? () async {
+                              setState(() {
+                                _isServiceRunning = true;
+                              });
+                              await startBluetoothService();
+                            }
+                          : null),
+                if (Platform.isIOS)
+                  CustomButton(
+                      label: "_Dienst starten",
+                      onPressed: startIosBluetoothService),
                 const SizedBox(height: 8),
                 CustomButton(
                   label: "Dienst beenden",
@@ -115,12 +126,13 @@ class SettingsState extends State<Settings> {
                     onPressed: () {
                       _showDialogTripPermissionOptions(context);
                     }),
-                    const SizedBox(height: 8),
-                CustomButton(
-                    label: "Berechtigungen setzen",
-                    onPressed: () async {
-                      await requestAllPermissions(context);
-                    }),
+                const SizedBox(height: 8),
+                if (Platform.isIOS)
+                  CustomButton(
+                      label: "iOS Berechtigungen anfordern",
+                      onPressed: () async {
+                        await requestAllPermissions(context);
+                      }),
               ],
             ),
           ),
