@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:driver_logbook/widgets/button_template.dart';
 import 'package:driver_logbook/models/globals.dart';
@@ -113,6 +115,12 @@ class SettingsState extends State<Settings> {
                     label: "Nutzer-Berechtigung einstellen",
                     onPressed: () {
                       _showDialogTripPermissionOptions(context);
+                    }),
+                if (Platform.isIOS) const SizedBox(height: 8),
+                CustomButton(
+                    label: "Berechtigungen setzen",
+                    onPressed: () async {
+                      await requestAllPermissions(context);
                     }),
               ],
             ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:driver_logbook/models/globals.dart';
 import 'package:driver_logbook/models/trip_category.dart';
 import 'package:driver_logbook/objectbox.dart';
@@ -38,11 +39,13 @@ class HomeState extends State<Home> {
     FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final areGranted = _prefs?.getBool('arePermissionsGranted') ?? false;
-      if (!areGranted) {
+      if (!areGranted && Platform.isAndroid) {
         // prevent requesting permissions if they are already granted
         await requestAllPermissions(context);
       }
-      initForegroundService();
+      if (Platform.isAndroid) {
+        initForegroundService();
+      }
       // start the background service automatically on startup
       if (await FlutterForegroundTask.isRunningService == false &&
           (areGranted || permissionGrantedForThisSession)) {
