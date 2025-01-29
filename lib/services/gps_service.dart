@@ -37,9 +37,10 @@ class GpsService {
               enableWakeLock: true));
     } else if (Platform.isIOS) {
       _locationSettings = AppleSettings(
-          accuracy: LocationAccuracy.high,
+          accuracy: LocationAccuracy.medium,
           activityType: ActivityType.automotiveNavigation,
           distanceFilter: 250,
+          timeLimit: const Duration(seconds: 4),
           pauseLocationUpdatesAutomatically: false,
           showBackgroundLocationIndicator: true,
           allowBackgroundLocationUpdates: true);
