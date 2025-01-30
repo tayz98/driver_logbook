@@ -121,29 +121,29 @@ class Elm327Controller {
       return;
     }
     // if no trip is running, start a new one
-    if (TripController().currentTrip == null) {
+    if (!isTripInProgress) {
       // get location
-// TODO: try catch more specific
-      final position = await GpsService().currentPosition;
-      CustomLogger.d("Current position: $position");
-      _tempLocation = await GpsService().getLocationFromPosition(position);
-      if (_tempLocation == null || _tempLocation?.street == 'not found') {
-        CustomLogger.w("Location not found");
-        final lastKnownPosition = await GpsService().lastKnownPosition;
-        if (lastKnownPosition != null) {
-          _tempLocation =
-              await GpsService().getLocationFromPosition(lastKnownPosition);
+      try {
+        final position = await GpsService().currentPosition;
+        CustomLogger.d("Current position: $position");
+        _tempLocation = await GpsService().getLocationFromPosition(position);
+        if (_tempLocation == null || _tempLocation?.street == 'not found') {
+          CustomLogger.w("Location not found");
+          final lastKnownPosition = await GpsService().lastKnownPosition;
+          if (lastKnownPosition != null) {
+            _tempLocation =
+                await GpsService().getLocationFromPosition(lastKnownPosition);
+          }
+          // CustomLogger.d("Last known position: $lastKnownPosition");
         }
-        // CustomLogger.d("Last known position: $lastKnownPosition");
+      } catch (e) {
+        CustomLogger.e("Error in ending trip: $e");
       }
       // CustomLogger.d("Location found: $_tempLocation");
       // finally start a trip
-      if (_tempLocation != null) {
-        TripController().startTrip(startLocation: _tempLocation);
-      } else {
-        TripController().startTrip();
-      }
-
+      _tempLocation ??= TripLocation(
+          city: "Unknown", street: "Unknown", postalCode: "Unknown");
+      TripController().startTrip(startLocation: _tempLocation);
       if (TripController().currentTrip != null) {
         // if a trip is started, log it
         // CustomLogger.i(_tripController!.currentTrip!.toJson());
@@ -182,20 +182,12 @@ class Elm327Controller {
         }
         CustomLogger.d("Last known position: $lastKnownPosition");
       }
-      CustomLogger.d("New Location found: $_tempLocation");
-      if (_tempLocation != null && _vehicleMileage != null) {
-        TripController()
-            .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
-      } else if (_tempLocation != null) {
-        TripController().endTrip(endLocation: _tempLocation);
-      } else if (_vehicleMileage != null) {
-        TripController().endTrip(mileage: _vehicleMileage);
-      } else {
-        TripController().endTrip();
-      }
     } catch (e) {
       CustomLogger.e("Error in _endTrip: $e");
     }
+    TripController()
+        .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
+
     CustomLogger.d("Cancelled all Timers on trip end");
     _updateForegroundNotificationText(
         "Fahrtaufzeichnung beendet", "Die Fahrt wurde beendet");

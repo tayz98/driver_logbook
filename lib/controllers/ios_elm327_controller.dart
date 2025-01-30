@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:driver_logbook/controllers/trip_controller.dart';
 import 'package:driver_logbook/models/trip_location.dart';
 import 'package:driver_logbook/models/vehicle.dart';
+import 'package:driver_logbook/notification_configuration.dart';
 import 'package:driver_logbook/services/gps_service.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
@@ -104,40 +105,9 @@ class IosElm327Controller {
     CustomLogger.i("ELM327 disposed");
   }
 
-  // void _startPositionStream() {
-  //   int vinCount = 0;
-  //   int mileageCount = 0;
-  //   _positionStream ??= Geolocator.getPositionStream(
-  //           locationSettings: GpsService().locationSettings)
-  //       .listen((Position position) async {
-  //     if (!isTripInProgress) {
-  //       _startTrip();
-  //     } else {
-  //       // trip not in progress
-  //       if (vinCount < 10 && _vehicle == null) {
-  //         await sendCommand(vinCommand);
-  //         vinCount++;
-  //       } else if (_vehicleMileage == null &&
-  //           _vehicle != null &&
-  //           mileageCount < 10) {
-  //         await sendCommand(
-  //             VehicleUtils.getVehicleMileageCommand(_vehicle!.vin));
-  //       } else if (mileageCount >= 10) {
-  //         CustomLogger.w("Mileage not received after 10 tries, ending trip");
-  //         await endTrip();
-  //       } else if (vinCount >= 10) {
-  //         CustomLogger.w("VIN not received after 10 tries, ending trip");
-  //         await endTrip();
-  //       }
-  //     }
-  //   });
-  // }
-
   // initiate a trip
   Future<void> _startTrip() async {
     CustomLogger.i("Starting trip");
-    // TripController().startTrip(
-    //     startLocation: TripLocation(street: "", city: "", postalCode: ""));
     if (isTripInProgress) {
       // flag to prevent race conditions
       CustomLogger.w("Trip already running, not starting a new one");
@@ -169,7 +139,8 @@ class IosElm327Controller {
       TripController().startTrip(startLocation: _tempLocation);
 
       if (TripController().currentTrip != null) {
-        CustomLogger.i("Trip started");
+        showBasicNotification(
+            title: "Die Fahrt ist gestartet", body: "Hab eine sichere Fahrt!");
       }
     }
   }
@@ -193,21 +164,12 @@ class IosElm327Controller {
           _tempLocation =
               await GpsService().getLocationFromPosition(lastKnownPosition);
         }
-        CustomLogger.d("Last known position: $lastKnownPosition");
-        if (_vehicleMileage == null) {
-          TripController()
-              .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
-        } else {
-          TripController().endTrip(endLocation: _tempLocation);
-        }
       }
     } catch (e) {
-      if (_vehicleMileage == null) {
-        TripController().endTrip(mileage: _vehicleMileage);
-      } else {
-        TripController().endTrip();
-      }
+      CustomLogger.e("Error in ending trip: $e");
     }
+    TripController()
+        .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
     CustomLogger.d("Cancelled all Timers on trip end");
     await dispose();
     CustomLogger.d("Resetted all trip variables on trip end");
