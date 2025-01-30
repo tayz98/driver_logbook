@@ -147,7 +147,12 @@ class IosElm327Controller {
   }
 
   // initiate a trip
+  bool isTripCreating = false;
   Future<void> _startTrip() async {
+    if (isTripCreating) {
+      CustomLogger.w("Trip already creating, not starting a new one");
+      return;
+    }
     if (isTripInProgress) {
       // flag to prevent race conditions
       CustomLogger.w("Trip already running, not starting a new one");
@@ -157,6 +162,7 @@ class IosElm327Controller {
     }
     // if no trip is running, start a new one
     if (!isTripInProgress) {
+      isTripCreating = true;
       // get location
       try {
         final position = await GpsService().currentPosition;
@@ -191,6 +197,7 @@ class IosElm327Controller {
             "Fahrtaufzeichnung", "Die Fahrt hat begonnen");
       }
     }
+    isTripCreating = false;
   }
 
   void _updateForegroundNotificationText(String title, String content) {

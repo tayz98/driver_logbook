@@ -24,6 +24,10 @@ class TripController {
   }
 
   void startTrip({TripLocation? startLocation}) {
+    if (_currentTrip != null) {
+      CustomLogger.e("Trip already started");
+      return;
+    }
     _instance._prefs.reload();
     _currentTrip = Trip(
       tripCategory: TripCategory
@@ -43,6 +47,7 @@ class TripController {
     }
     _currentTrip!.startMileage = mileage;
     CustomLogger.i('Added start mileage to trip: $mileage');
+    //
   }
 
   void updateTripVehicle(Vehicle? vehicle) {

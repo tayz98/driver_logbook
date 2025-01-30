@@ -39,9 +39,9 @@ class GpsService {
       _locationSettings = AppleSettings(
           accuracy: LocationAccuracy.medium,
           activityType: ActivityType.automotiveNavigation,
-          distanceFilter: 0,
+          distanceFilter: 10,
           // timeLimit: const Duration(seconds: 4),
-          pauseLocationUpdatesAutomatically: false,
+          pauseLocationUpdatesAutomatically: true,
           showBackgroundLocationIndicator: true,
           allowBackgroundLocationUpdates: true);
     }
@@ -80,17 +80,27 @@ class GpsService {
   }
 
   Future<TripLocation> getLocationFromPosition(Position position) async {
-    final List<Placemark> placemarks =
-        await placemarkFromCoordinates(position.latitude, position.longitude);
-    if (placemarks.isEmpty) {
-      return TripLocation(
-          street: 'not found', city: 'not found', postalCode: 'not found');
-    } else {
+    try {
+      final List<Placemark> placemarks =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
       return TripLocation(
         street: placemarks.first.street ?? 'not found',
         city: placemarks.first.locality ?? 'not found',
         postalCode: placemarks.first.postalCode ?? 'not found',
       );
+    } catch (e) {
+      return TripLocation(
+          street: 'not found', city: 'not found', postalCode: 'not found');
     }
+    // if (placemarks.isEmpty) {
+    //   return TripLocation(
+    //       street: 'not found', city: 'not found', postalCode: 'not found');
+    // } else {
+    //   return TripLocation(
+    //     street: placemarks.first.street ?? 'not found',
+    //     city: placemarks.first.locality ?? 'not found',
+    //     postalCode: placemarks.first.postalCode ?? 'not found',
+    //   );
+    // }
   }
 }
