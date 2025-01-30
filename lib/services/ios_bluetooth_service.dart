@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:driver_logbook/controllers/ios_elm327_controller.dart';
+import 'package:driver_logbook/controllers/trip_controller.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/utils/extra.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
@@ -40,6 +41,7 @@ class IosBluetoothService {
     CustomLogger.d('IOS: Initialized knownRemoteIds');
     await VehicleUtils.initializeVehicleModels();
     FlutterBluePlus.setOptions(restoreState: true);
+    TripController.initialize();
 
     _connectionStateSubscription ??=
         FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {

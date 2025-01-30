@@ -5,11 +5,8 @@ import 'package:driver_logbook/models/trip_location.dart';
 import 'package:driver_logbook/models/vehicle.dart';
 import 'package:driver_logbook/services/gps_service.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
-import 'package:driver_logbook/utils/help.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class IosElm327Controller {
   final BluetoothDevice _device;
@@ -47,41 +44,32 @@ class IosElm327Controller {
 
   Future<bool> initialize() async {
     _responseBuffer = '';
-    if (_isInitialized) {
-      CustomLogger.w("ELM327 already initialized");
-      return true;
-    }
-    final prefs = await SharedPreferences.getInstance();
+    // if (_isInitialized) {
+    //   CustomLogger.w("ELM327 already initialized");
+    //   return true;
+    // }
 
-    final bool isAlreadyInitialized =
-        prefs.getBool(_device.remoteId.str) ?? false;
-
-    if (!isAlreadyInitialized) {
-      List<String> initCommands = [
-        // "ATZ", // Reset ELM327
-        // "ATD", // reset defaults
-        // "ATSP0", // Set Protocol to Automatic
-        //"ATE0", // Echo Off
-        // "ATL0", // Linefeeds Off
-        // "ATS0", // Spaces Off
-        "ATH1", // Headers On
-        "ATSH 7E0", // Set Header to 7E0
-      ];
-      for (String cmd in initCommands) {
-        bool success = await sendCommand(cmd);
-        if (!success) {
-          CustomLogger.e("Failed to send command: $cmd");
-          return false;
-        } else {
-          // this needs to be at least 4000ms for the commands to register
-          await Future.delayed(const Duration(milliseconds: 4000));
-        }
+    List<String> initCommands = [
+      // "ATZ", // Reset ELM327
+      // "ATD", // reset defaults
+      // "ATSP0", // Set Protocol to Automatic
+      //"ATE0", // Echo Off
+      // "ATL0", // Linefeeds Off
+      // "ATS0", // Spaces Off
+      "ATH1", // Headers On
+      "ATSH 7E0", // Set Header to 7E0
+    ];
+    for (String cmd in initCommands) {
+      bool success = await sendCommand(cmd);
+      if (!success) {
+        CustomLogger.e("Failed to send command: $cmd");
+        return false;
+      } else {
+        // this needs to be at least 4000ms for the commands to register
+        await Future.delayed(const Duration(milliseconds: 4000));
       }
-    } else {
-      CustomLogger.i("ELM327 already initialized, skipping setup");
     }
     _isInitialized = true;
-    await prefs.setBool(_device.remoteId.str, _isInitialized);
     // problem:
     // if the adapter is taken out of the car, it will reset and needs a new initialization
     // so, saving the initialization status to shared preferences might not be the best idea
@@ -146,12 +134,10 @@ class IosElm327Controller {
   // }
 
   // initiate a trip
-  bool isTripCreating = false;
   Future<void> _startTrip() async {
-    if (isTripCreating) {
-      CustomLogger.w("Trip already creating, not starting a new one");
-      return;
-    }
+    CustomLogger.i("Starting trip");
+    // TripController().startTrip(
+    //     startLocation: TripLocation(street: "", city: "", postalCode: ""));
     if (isTripInProgress) {
       // flag to prevent race conditions
       CustomLogger.w("Trip already running, not starting a new one");
@@ -161,7 +147,6 @@ class IosElm327Controller {
     }
     // if no trip is running, start a new one
     if (!isTripInProgress) {
-      isTripCreating = true;
       // get location
       try {
         final position = await GpsService().currentPosition;
@@ -174,36 +159,19 @@ class IosElm327Controller {
             _tempLocation =
                 await GpsService().getLocationFromPosition(lastKnownPosition);
           }
-          TripController().startTrip(startLocation: _tempLocation);
-
-          // CustomLogger.d("Last known position: $lastKnownPosition");
         }
       } catch (e) {
         CustomLogger.e(
             "Error in getting location, starting trip without it: $e");
-        TripController().startTrip();
       }
-      // CustomLogger.d("Location found: $_tempLocation");
-      // finally start a trip
-      if (_tempLocation != null) {
-      } else {}
+      // start a new trip
+      _tempLocation ??= TripLocation(street: "", city: "", postalCode: "");
+      TripController().startTrip(startLocation: _tempLocation);
 
       if (TripController().currentTrip != null) {
-        // if a trip is started, log it
-        // CustomLogger.i(_tripController!.currentTrip!.toJson());
         CustomLogger.i("Trip started");
-        _updateForegroundNotificationText(
-            "Fahrtaufzeichnung", "Die Fahrt hat begonnen");
       }
     }
-    isTripCreating = false;
-  }
-
-  void _updateForegroundNotificationText(String title, String content) {
-    FlutterForegroundTask.updateService(
-        notificationTitle: title,
-        notificationText: Helper.formatDateString(
-            content + DateTime.now().toIso8601String()));
   }
 
   // end a trip
@@ -241,10 +209,9 @@ class IosElm327Controller {
       }
     }
     CustomLogger.d("Cancelled all Timers on trip end");
-    _updateForegroundNotificationText(
-        "Fahrtaufzeichnung beendet", "Die Fahrt wurde beendet");
     await dispose();
     CustomLogger.d("Resetted all trip variables on trip end");
+    isWaiting = false;
     await startVoltageTimer();
     // after trip ends, start voltage timer again
     // to check if a consecutive trip is started
@@ -338,9 +305,13 @@ class IosElm327Controller {
     }
   }
 
+  bool isWaiting = false;
   Future<void> _handleResponseToVoltCommand(String response) async {
     CustomLogger.d("Voltage response: $response");
-    CustomLogger.d("Voltage command response");
+    if (isWaiting == true) {
+      CustomLogger.d("Waiting for trip to end, skipping voltage response");
+      return;
+    }
     while (response.startsWith("ATRV")) {
       response = response.substring("ATRV".length).trim();
     }
@@ -352,12 +323,13 @@ class IosElm327Controller {
       if (voltageIntValue != null) {
         _voltageVal = voltageIntValue / 10;
         CustomLogger.d("Voltage is: $_voltageVal");
+
         final rssi = await _device.readRssi();
-        if (_voltageVal! >= 11.0 && rssi >= -70) {
+        if (_voltageVal! >= 13.0 && rssi >= -70) {
           CustomLogger.i(
               "Voltage is at or above 13V, engine is running, and signal strength is good");
           CustomLogger.d("Cancelling voltage timer and starting telemetry");
-          _startTelemetryCollection();
+          await _startTelemetryCollection();
         }
       } else {
         CustomLogger.w("Voltage int couldn't be parsed, is null");
@@ -366,6 +338,7 @@ class IosElm327Controller {
   }
 
   void _handleResponseToVinCommand(String response) {
+    CustomLogger.d("Handling VIN response");
     if (_vehicle != null) {
       CustomLogger.w("VIN already set, skipping VIN response handle");
       return;
@@ -382,6 +355,7 @@ class IosElm327Controller {
   }
 
   Future<void> _handleResponseToMileageCommand(String response) async {
+    CustomLogger.d("Mileage response: $response");
     if (_vehicle == null) {
       CustomLogger.w("Vehicle is null, can't handle mileage response");
       return;
@@ -445,68 +419,66 @@ class IosElm327Controller {
 
   // request VIN from the vehicle
 
-  Future<void> _requestVin() async {
-    const maxTries = 10;
-    CustomLogger.d("Requesting VIN");
-
-    void tryRequest(int attempt) {
-      // Exit condition: Max attempts or VIN received
-      if (attempt >= maxTries || _vehicle != null) return;
-
-      // Send VIN command
-      sendCommand(vinCommand).then((_) {
-        CustomLogger.d("VIN command sent, attempt nr.: $attempt");
-        // Schedule next attempt recursively after 2 seconds
-        Timer(const Duration(seconds: 2), () => tryRequest(attempt + 1));
-      });
-    }
-
-    // Start the first attempt
-    tryRequest(0);
-  }
-  // Future<bool> _requestVin() async {
+  // Future<void> _requestVin() async {
+  //   const maxTries = 10;
   //   CustomLogger.d("Requesting VIN");
-  //   if (_voltageVal == null) {
-  //     CustomLogger.fatal("Voltage is null, can't request VIN");
-  //     return false;
+
+  //   void tryRequest(int attempt) {
+  //     // Exit condition: Max attempts or VIN received
+  //     if (attempt >= maxTries || _vehicle != null) return;
+
+  //     // Send VIN command
+  //     sendCommand(vinCommand).then((_) {
+  //       CustomLogger.d("VIN command sent, attempt nr.: $attempt");
+  //       // Schedule next attempt recursively after 2 seconds
+  //       Timer(const Duration(seconds: 2), () => tryRequest(attempt + 1));
+  //     });
   //   }
-  //   const int maxTries = 10;
-  //   try {
-  //     if (_device.isDisconnected) {
-  //       CustomLogger.w("Device is not connected, can't request VIN");
-  //       return false;
-  //     }
 
-  //     CustomLogger.d("Sending VIN request");
-  //     for (int i = 0; i < maxTries; i++) {
-  //       final success = await sendCommand(vinCommand);
-  //       if (!success) {
-  //         CustomLogger.w("Failed to send VIN command");
-  //       } else {
-  //         CustomLogger.d("VIN command sent");
-  //       }
-
-  //       await Future.delayed(
-  //           const Duration(seconds: 2)); // small delay between requests
-  //       if (_vehicleVin != null) {
-  //         // checking if VIN was set
-  //         CustomLogger.i("VIN set after $i tries");
-  //         break;
-  //       }
-  //     }
-
-  //     if (_vehicleVin == null) {
-  //       CustomLogger.fatal("VIN not set after $maxTries tries");
-  //       return false;
-  //     } else {
-  //       CustomLogger.d("VIN: $_vehicleVin");
-  //     }
-  //   } catch (e) {
-  //     CustomLogger.fatal("Error in requesting VIN: $e");
-  //     return false;
-  //   }
-  //   return true;
+  //   // Start the first attempt
+  //   tryRequest(0);
   // }
+  Future<bool> _requestVin() async {
+    CustomLogger.d("Requesting VIN");
+    if (_voltageVal == null) {
+      CustomLogger.fatal("Voltage is null, can't request VIN");
+      return false;
+    }
+    const int maxTries = 10;
+    try {
+      if (_device.isDisconnected) {
+        CustomLogger.w("Device is not connected, can't request VIN");
+        return false;
+      }
+
+      CustomLogger.d("Sending VIN request");
+      for (int i = 0; i < maxTries; i++) {
+        final success = await sendCommand(vinCommand);
+        if (!success) {
+          CustomLogger.w("Failed to send VIN command");
+        } else {
+          CustomLogger.d("VIN command sent");
+        }
+
+        await Future.delayed(
+            const Duration(seconds: 2)); // small delay between requests
+        if (_vehicle != null) {
+          // checking if VIN was set
+          CustomLogger.i("VIN set after ${i + 1} tries");
+          return true;
+        }
+      }
+
+      if (_vehicle == null) {
+        CustomLogger.fatal("VIN not set after ${maxTries + 1} tries");
+        return false;
+      }
+    } catch (e) {
+      CustomLogger.fatal("Error in requesting VIN: $e");
+      return false;
+    }
+    return true;
+  }
 
   Future<void> _startRequestingMileage() async {
     if (_vehicle == null) {
@@ -532,6 +504,7 @@ class IosElm327Controller {
 
   // // is called by handleResponseToVoltCommand
   Future<void> _startTelemetryCollection() async {
+    isWaiting = true;
     if (isTripInProgress) {
       CustomLogger.w("Trip already running, skipping telemetry collection");
       return;

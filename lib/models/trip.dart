@@ -39,9 +39,11 @@ class Trip {
       TripStatus.values.firstWhere((e) => e.toString() == tripStatus);
 
   // Getter/Setter for startLocation
-  TripLocation get startLocation {
-    if (startLocationJson == null || startLocationJson == "null") {
-      throw const FormatException("startLocationJson is empty");
+  TripLocation? get startLocation {
+    if (startLocationJson == null ||
+        startLocationJson!.isEmpty ||
+        startLocationJson == "null") {
+      return null;
     }
     return TripLocation.fromJson(jsonDecode(startLocationJson!));
   }
@@ -54,13 +56,17 @@ class Trip {
         vehicleJson != null;
   }
 
-  set startLocation(TripLocation location) =>
-      startLocationJson = jsonEncode(location.toJson());
+  set startLocation(TripLocation? location) {
+    startLocationJson = location != null ? jsonEncode(location.toJson()) : null;
+  }
 
-  set vehicle(Vehicle vehicle) => vehicleJson = jsonEncode(vehicle.toJson());
-  Vehicle get vehicle {
+  set vehicle(Vehicle? vehicle) {
+    vehicleJson = vehicle != null ? jsonEncode(vehicle.toJson()) : null;
+  }
+
+  Vehicle? get vehicle {
     if (vehicleJson == null || vehicleJson == "null") {
-      throw const FormatException("vehicleJson is empty");
+      return null;
     }
     return Vehicle.fromJson(jsonDecode(vehicleJson!));
   }
@@ -85,13 +91,13 @@ class Trip {
       'id': id,
       'startMileage': startMileage,
       'endMileage': endMileage,
-      'vehicle': vehicle.toJson(),
+      'vehicle': vehicle?.toJson(),
       'startTimestamp': startTimestamp,
       'endTimestamp': endTimestamp,
       'endDate': endTimestamp,
       'tripCategory': getCategoryShortForm(tripCategory),
       'tripStatus': getStatusShortForm(tripStatus),
-      'startLocation': startLocation.toJson(),
+      'startLocation': startLocation?.toJson(),
       'endLocation': endLocation?.toJson(),
     };
   }

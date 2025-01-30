@@ -29,21 +29,27 @@ class TripController {
       return;
     }
     _instance._prefs.reload();
-    _currentTrip = Trip(
-      tripCategory: TripCategory
-          .values[_instance._prefs.getInt('tripCategory2') ?? 0]
-          .toString(),
-      tripStatus: TripStatus.inProgress.toString(),
-      startLocationJson:
-          startLocation == null ? null : jsonEncode(startLocation.toJson()),
-    );
+    CustomLogger.d("in startTrip");
+    try {
+      CustomLogger.d("in try block");
+      _currentTrip = Trip(
+        tripCategory: TripCategory
+            .values[_instance._prefs.getInt('tripCategory2') ?? 0]
+            .toString(),
+        tripStatus: TripStatus.inProgress.toString(),
+        startLocationJson:
+            startLocation == null ? null : jsonEncode(startLocation.toJson()),
+      );
+    } catch (e) {
+      CustomLogger.e('Error while starting trip: $e');
+    }
+    CustomLogger.d("Trip start");
     CustomLogger.i('Trip started: ${jsonEncode(_currentTrip!.toJson())}');
   }
 
   void updateTripStartMileage(int? mileage) {
     if (_currentTrip == null) {
       CustomLogger.e("Trip not found");
-      throw Exception('Trip not found');
     }
     _currentTrip!.startMileage = mileage;
     CustomLogger.i('Added start mileage to trip: $mileage');
@@ -66,7 +72,6 @@ class TripController {
   void endTrip({TripLocation? endLocation, int? mileage}) {
     if (_currentTrip == null) {
       CustomLogger.e("Trip not found");
-      throw Exception('Trip not found');
     }
     if (mileage != null) {
       _currentTrip!.endMileage = mileage;

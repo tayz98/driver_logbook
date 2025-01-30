@@ -9,7 +9,6 @@ import 'package:driver_logbook/utils/help.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class Elm327Controller {
   final BluetoothDevice _device;
@@ -46,41 +45,39 @@ class Elm327Controller {
 
   Future<bool> initialize() async {
     _responseBuffer = '';
-    if (_isInitialized) {
-      CustomLogger.w("ELM327 already initialized");
-      return true;
-    }
-    final prefs = await SharedPreferences.getInstance();
+    // if (_isInitialized) {
+    //   CustomLogger.w("ELM327 already initialized");
+    //   return true;
+    // }
+    // final prefs = await SharedPreferences.getInstance();
 
-    final bool isAlreadyInitialized =
-        prefs.getBool(_device.remoteId.str) ?? false;
+    // final bool isAlreadyInitialized =
+    //     prefs.getBool(_device.remoteId.str) ?? false;
 
-    if (!isAlreadyInitialized) {
-      List<String> initCommands = [
-        // "ATZ", // Reset ELM327
-        // "ATD", // reset defaults
-        // "ATSP0", // Set Protocol to Automatic
-        //"ATE0", // Echo Off
-        // "ATL0", // Linefeeds Off
-        // "ATS0", // Spaces Off
-        "ATH1", // Headers On
-        "ATSH 7E0", // Set Header to 7E0
-      ];
-      for (String cmd in initCommands) {
-        bool success = await sendCommand(cmd);
-        if (!success) {
-          CustomLogger.e("Failed to send command: $cmd");
-          return false;
-        } else {
-          // this needs to be at least 4000ms for the commands to register
-          await Future.delayed(const Duration(milliseconds: 4000));
-        }
+    // if (!isAlreadyInitialized) {
+
+    List<String> initCommands = [
+      // "ATZ", // Reset ELM327
+      // "ATD", // reset defaults
+      // "ATSP0", // Set Protocol to Automatic
+      //"ATE0", // Echo Off
+      // "ATL0", // Linefeeds Off
+      // "ATS0", // Spaces Off
+      "ATH1", // Headers On
+      "ATSH 7E0", // Set Header to 7E0
+    ];
+    for (String cmd in initCommands) {
+      bool success = await sendCommand(cmd);
+      if (!success) {
+        CustomLogger.e("Failed to send command: $cmd");
+        return false;
+      } else {
+        // this needs to be at least 4000ms for the commands to register
+        await Future.delayed(const Duration(milliseconds: 4000));
       }
-    } else {
-      CustomLogger.i("ELM327 already initialized, skipping setup");
     }
     _isInitialized = true;
-    await prefs.setBool(_device.remoteId.str, _isInitialized);
+    // await prefs.setBool(_device.remoteId.str, _isInitialized);
     // problem:
     // if the adapter is taken out of the car, it will reset and needs a new initialization
     // so, saving the initialization status to shared preferences might not be the best idea
@@ -91,6 +88,7 @@ class Elm327Controller {
     CustomLogger.d("ELM327 initialized status saved to shared preferences");
     CustomLogger.i("ELM327 initialized");
     return _isInitialized;
+    // }
   }
   // send command to elm327
 

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:driver_logbook/models/globals.dart';
 import 'package:driver_logbook/models/trip_category.dart';
 import 'package:driver_logbook/objectbox.dart';
+import 'package:driver_logbook/repositories/trip_repository.dart';
+import 'package:driver_logbook/services/http_service.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/views/settings_screen.dart';
 import 'package:driver_logbook/widgets/choose_trip_mode_buttons.dart';
@@ -54,6 +56,24 @@ class HomeState extends State<Home> {
       // Check if service is running and set the state accordingly
       if (await FlutterForegroundTask.isRunningService &&
           (areGranted || permissionGrantedForThisSession)) {}
+      if (Platform.isIOS) {
+        final tripsToTransmit =
+            TripRepository.fetchCompletedAndCancelledTrips();
+        if (tripsToTransmit.isEmpty) {
+          CustomLogger.d("No trips to transmit");
+          return;
+        }
+        for (final trip in tripsToTransmit) {
+          final response = await HttpService()
+              .post(type: ServiceType.trip, body: trip.toJson());
+          if (response.statusCode == 201) {
+            CustomLogger.i("Trip transmitted successfully");
+            TripRepository.deleteTrip(trip.id);
+          } else {
+            CustomLogger.w("Error in transmitting trip: ${response.body}");
+          }
+        }
+      }
     });
     _startListeningToChangesAndRedirectToTask();
   }
