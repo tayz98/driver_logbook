@@ -135,7 +135,8 @@ class IosElm327Controller {
             "Error in getting location, starting trip without it: $e");
       }
       // start a new trip
-      _tempLocation ??= TripLocation(street: "", city: "", postalCode: "");
+      _tempLocation ??= TripLocation(
+          street: "", city: "", postalCode: "", latitude: 0, longitude: 0);
       TripController().startTrip(startLocation: _tempLocation);
 
       if (TripController().currentTrip != null) {

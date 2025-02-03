@@ -84,23 +84,20 @@ class GpsService {
       final List<Placemark> placemarks =
           await placemarkFromCoordinates(position.latitude, position.longitude);
       return TripLocation(
-        street: placemarks.first.street ?? 'not found',
-        city: placemarks.first.locality ?? 'not found',
-        postalCode: placemarks.first.postalCode ?? 'not found',
+        street: placemarks.first.street ?? '',
+        city: placemarks.first.locality ?? '',
+        postalCode: placemarks.first.postalCode ?? '',
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
     } catch (e) {
       return TripLocation(
-          street: 'not found', city: 'not found', postalCode: 'not found');
+        street: '',
+        city: '',
+        postalCode: '',
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
     }
-    // if (placemarks.isEmpty) {
-    //   return TripLocation(
-    //       street: 'not found', city: 'not found', postalCode: 'not found');
-    // } else {
-    //   return TripLocation(
-    //     street: placemarks.first.street ?? 'not found',
-    //     city: placemarks.first.locality ?? 'not found',
-    //     postalCode: placemarks.first.postalCode ?? 'not found',
-    //   );
-    // }
   }
 }

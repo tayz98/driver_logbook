@@ -142,7 +142,7 @@ class Elm327Controller {
       // CustomLogger.d("Location found: $_tempLocation");
       // finally start a trip
       _tempLocation ??= TripLocation(
-          city: "Unknown", street: "Unknown", postalCode: "Unknown");
+          city: "", street: "", postalCode: "", latitude: 0, longitude: 0);
       TripController().startTrip(startLocation: _tempLocation);
       if (TripController().currentTrip != null) {
         // if a trip is started, log it
