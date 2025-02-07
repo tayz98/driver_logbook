@@ -49,11 +49,20 @@ class Trip {
   }
 
   bool isTripCompleted() {
-    return startMileage != null &&
-        endMileage != null &&
-        startLocationJson != null &&
-        endLocationJson != null &&
-        vehicleJson != null;
+    // if a trip is business, it must have start and end mileage, start and end location and vehicle
+    if (tripCategoryEnum == TripCategory.business) {
+      return startMileage != null &&
+          endMileage != null &&
+          startLocationJson != null &&
+          endLocationJson != null &&
+          vehicleJson != null;
+    }
+    // if a trip is private, it must have start and end mileage and vehicle
+    if (tripCategoryEnum == TripCategory.private ||
+        tripCategoryEnum == TripCategory.private) {
+      return startMileage != null && endMileage != null && vehicleJson != null;
+    }
+    return false;
   }
 
   set startLocation(TripLocation? location) {
