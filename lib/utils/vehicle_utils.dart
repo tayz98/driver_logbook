@@ -19,7 +19,10 @@ class VehicleUtils {
     // add more if needed
   }
 
-  static String getVehicleMileageCommand(String vin) {
+  static String getVehicleMileageCommand(String? vin) {
+    if (vin == null) {
+      throw ArgumentError.notNull("vin");
+    }
     String? model = vehicleModels[vin];
     switch (model) {
       case 'Skoda Citigo 2016':

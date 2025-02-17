@@ -1,16 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:driver_logbook/controllers/trip_controller.dart';
-import 'package:driver_logbook/models/trip_location.dart';
 import 'package:driver_logbook/models/vehicle.dart';
-import 'package:driver_logbook/services/gps_service.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
-import 'package:driver_logbook/utils/help.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:driver_logbook/models/telemetry_event.dart';
+import 'package:driver_logbook/models/telemetry_bus.dart';
 
-class Elm327Controller {
+class Elm327Service {
   final BluetoothDevice _device;
   get deviceId => _device.remoteId;
   final BluetoothCharacteristic _writeCharacteristic;
@@ -20,11 +18,8 @@ class Elm327Controller {
   // just a getter for task handler and to simplify the code
   bool get isTripInProgress => TripController().currentTrip != null;
   // telemetry-related:
-  String? _vehicleVin; // used for saving the vin
-  int? _vehicleMileage; // used for saving and tracking the mileage
   double?
       _voltageVal; // used for checking voltage of the vehicle (engine runnning)
-  TripLocation? _tempLocation;
   final String vinCommand =
       "0902"; // standardized obd2 command for requesting the vin
   final String voltageCommand =
@@ -34,8 +29,11 @@ class Elm327Controller {
   Timer?
       _mileageSendCommandTimer; // used for sending mileage requests continuously
   String _responseBuffer = ''; // buffer for incoming data from the elm327
+  Vehicle? _vehicle; // used for saving the vehicle
+  bool isVoltageCommandOkToSend = true;
+  bool isTelemetryRunning = false;
 
-  Elm327Controller({
+  Elm327Service({
     required BluetoothDevice device,
     required BluetoothCharacteristic writeCharacteristic,
     required BluetoothCharacteristic notifyCharacteristic,
@@ -94,109 +92,26 @@ class Elm327Controller {
 
   // reset trip variables and timers
   Future<void> dispose() async {
-    if (isTripInProgress) {
-      await endTrip();
-    }
     _isInitialized = false;
-    _vehicleVin = null;
-    _vehicleMileage = null;
+    _vehicle = null;
     _voltageVal = null;
-    _tempLocation = null;
     _responseBuffer = '';
     _voltageTimer?.cancel();
     _tripTimeoutTimer?.cancel();
     _tripTimeoutTimer = null;
     _mileageSendCommandTimer?.cancel();
     _mileageSendCommandTimer = null;
+    isTelemetryRunning = false;
+    isVoltageCommandOkToSend = true;
     CustomLogger.i("ELM327 disposed");
   }
 
-  // initiate a trip
-  Future<void> _startTrip() async {
-    if (isTripInProgress) {
-      // flag to prevent race conditions
-      CustomLogger.w("Trip already running, not starting a new one");
-      CustomLogger.w(
-          "Variables - Trip in Progress: $isTripInProgress, current trip: ${TripController().currentTrip}");
-      return;
-    }
-    // if no trip is running, start a new one
-    if (!isTripInProgress) {
-      // get location
-      try {
-        final position = await GpsService().currentPosition;
-        CustomLogger.d("Current position: $position");
-        _tempLocation = await GpsService().getLocationFromPosition(position);
-        if (_tempLocation == null || _tempLocation?.street == 'not found') {
-          CustomLogger.w("Location not found");
-          final lastKnownPosition = await GpsService().lastKnownPosition;
-          if (lastKnownPosition != null) {
-            _tempLocation =
-                await GpsService().getLocationFromPosition(lastKnownPosition);
-          }
-          // CustomLogger.d("Last known position: $lastKnownPosition");
-        }
-      } catch (e) {
-        CustomLogger.e("Error in ending trip: $e");
-      }
-      // CustomLogger.d("Location found: $_tempLocation");
-      // finally start a trip
-      _tempLocation ??= TripLocation(
-          city: "", street: "", postalCode: "", latitude: 0, longitude: 0);
-      TripController().startTrip(startLocation: _tempLocation);
-      if (TripController().currentTrip != null) {
-        // if a trip is started, log it
-        // CustomLogger.i(_tripController!.currentTrip!.toJson());
-        CustomLogger.i("Trip started");
-        _updateForegroundNotificationText(
-            "Fahrtaufzeichnung", "Die Fahrt hat begonnen");
-      }
-    }
-  }
-
-  void _updateForegroundNotificationText(String title, String content) {
-    FlutterForegroundTask.updateService(
-        notificationTitle: title,
-        notificationText: Helper.formatDateString(
-            content + DateTime.now().toIso8601String()));
-  }
-
-  // end a trip
-  Future<void> endTrip() async {
-    if (!isTripInProgress) {
-      CustomLogger.w("No trip to end");
-      CustomLogger.d(
-          "Variables - Trip in Progress: $isTripInProgress, current trip: ${TripController().currentTrip}");
-      return;
-    }
-    try {
-      final endPosition = await GpsService().currentPosition;
-      CustomLogger.d("End position: $endPosition");
-      _tempLocation = await GpsService().getLocationFromPosition(endPosition);
-      if (_tempLocation == null || _tempLocation?.street == 'not found') {
-        CustomLogger.w("End location not found");
-        final lastKnownPosition = await GpsService().lastKnownPosition;
-        if (lastKnownPosition != null) {
-          _tempLocation =
-              await GpsService().getLocationFromPosition(lastKnownPosition);
-        }
-        CustomLogger.d("Last known position: $lastKnownPosition");
-      }
-    } catch (e) {
-      CustomLogger.e("Error in _endTrip: $e");
-    }
-    TripController()
-        .endTrip(endLocation: _tempLocation, mileage: _vehicleMileage);
-
-    CustomLogger.d("Cancelled all Timers on trip end");
-    _updateForegroundNotificationText(
-        "Fahrtaufzeichnung beendet", "Die Fahrt wurde beendet");
-    await dispose();
-    CustomLogger.d("Resetted all trip variables on trip end");
-    await startVoltageTimer();
-    // after trip ends, start voltage timer again
-    // to check if a consecutive trip is started
-  }
+  // void _updateForegroundNotificationText(String title, String content) {
+  //   FlutterForegroundTask.updateService(
+  //       notificationTitle: title,
+  //       notificationText: Helper.formatDateString(
+  //           content + DateTime.now().toIso8601String()));
+  // }
 
   // send a command to the elm327
   Future<bool> sendCommand(String command) async {
@@ -279,9 +194,9 @@ class Elm327Controller {
 
     // mileage command
     if (cleanedResponse
-        .contains(VehicleUtils.getVehicleMileageCommand(_vehicleVin!))) {
+        .contains(VehicleUtils.getVehicleMileageCommand(_vehicle?.vin))) {
       cleanedResponse = cleanedResponse.replaceFirst(
-          VehicleUtils.getVehicleMileageCommand(_vehicleVin!), "");
+          VehicleUtils.getVehicleMileageCommand(_vehicle?.vin), "");
       await _handleResponseToMileageCommand(cleanedResponse);
     }
   }
@@ -302,12 +217,18 @@ class Elm327Controller {
         CustomLogger.d("Voltage is: $_voltageVal");
         final rssi = await _device.readRssi();
         if (_voltageVal! >= 13.0 && rssi >= -70) {
+          final event = TelemetryEvent(
+            voltage: _voltageVal,
+          );
+          TelemetryBus().publish(event);
           CustomLogger.i(
               "Voltage is at or above 13V, engine is running, and signal strength is good");
           CustomLogger.d("Cancelling voltage timer and starting telemetry");
-          _voltageTimer?.cancel();
-          _voltageTimer = null;
-          await _startTelemetryCollection();
+          // _voltageTimer?.cancel();
+          // _voltageTimer = null;
+          if (!isTelemetryRunning) {
+            await _startTelemetryCollection();
+          }
         }
       } else {
         CustomLogger.w("Voltage int couldn't be parsed, is null");
@@ -316,7 +237,8 @@ class Elm327Controller {
   }
 
   void _handleResponseToVinCommand(String response) {
-    if (_vehicleVin != null) {
+    CustomLogger.d("Handling VIN response");
+    if (_vehicle != null) {
       CustomLogger.w("VIN already set, skipping VIN response handle");
       return;
     }
@@ -324,8 +246,8 @@ class Elm327Controller {
     CustomLogger.d("Calculated VIN: $vin");
     final isVinValid = _checkVin(vin);
     if (isVinValid) {
-      _vehicleVin = vin;
-      CustomLogger.d("VIN valid and now set to: $_vehicleVin");
+      _vehicle ??= Vehicle.fromVin(vin);
+      CustomLogger.d("VIN valid and vehicle set");
     } else {
       CustomLogger.w("VIN is invalid");
     }
@@ -333,41 +255,14 @@ class Elm327Controller {
 
   Future<void> _handleResponseToMileageCommand(String response) async {
     CustomLogger.d("Handling mileage response");
-    final mileage = VehicleUtils.getVehicleKm(_vehicleVin!, response);
+    final mileage = VehicleUtils.getVehicleKm(_vehicle!.vin, response);
     CustomLogger.i("Mileage response: $mileage");
     final isMileageValid = _checkMileage(mileage);
-
     if (isMileageValid) {
-      if (isTripInProgress &&
-          TripController().currentTrip?.startMileage == null) {
-        TripController().updateTripStartMileage(mileage);
-      }
-      _tripTimeoutTimer?.cancel();
-      _tripTimeoutTimer = null;
-      CustomLogger.d("Trip timeout timer cancelled");
-      _vehicleMileage = mileage;
-      CustomLogger.d("Trip timeout timer called");
-      _tripTimeoutTimer = Timer(const Duration(seconds: 10), () async {
-        CustomLogger.d("Trip timeout has lapsed");
-        _mileageSendCommandTimer?.cancel();
-        _mileageSendCommandTimer = null;
-        if (isTripInProgress) {
-          CustomLogger.i("Trip timeout, ending trip...");
-          try {
-            await endTrip();
-          } catch (e) {
-            CustomLogger.e("Error in trip timeout: $e");
-          }
-        } else {
-          CustomLogger.w("Trip already ended, skipping trip timeout");
-        }
-      });
+      TelemetryEvent event = TelemetryEvent(mileage: mileage);
+      TelemetryBus().publish(event);
     } else {
       CustomLogger.w("Mileage is invalid");
-      if (isTripInProgress) {
-        CustomLogger.i("Trip running, cancelling trip...");
-        await endTrip();
-      }
     }
   }
 
@@ -382,6 +277,10 @@ class Elm327Controller {
           _voltageTimer = null;
           return;
         }
+        if (!isVoltageCommandOkToSend) {
+          CustomLogger.w("Voltage command not ok to send");
+          return;
+        }
         await sendCommand(voltageCommand);
       } catch (e) {
         CustomLogger.e("Error in _voltageTimer: $e");
@@ -391,6 +290,7 @@ class Elm327Controller {
 
   // request VIN from the vehicle
   Future<bool> _requestVin() async {
+    isVoltageCommandOkToSend = false;
     CustomLogger.d("Requesting VIN");
     if (_voltageVal == null) {
       CustomLogger.fatal("Voltage is null, can't request VIN");
@@ -414,33 +314,35 @@ class Elm327Controller {
 
         await Future.delayed(
             const Duration(seconds: 2)); // small delay between requests
-        if (_vehicleVin != null) {
+        if (_vehicle != null) {
           // checking if VIN was set
-          CustomLogger.i("VIN set after $i tries");
-          break;
+          CustomLogger.i("VIN set after ${i + 1} tries");
+          TelemetryEvent event = TelemetryEvent(vehicle: _vehicle);
+          TelemetryBus().publish(event);
+          return true;
         }
       }
 
-      if (_vehicleVin == null) {
-        CustomLogger.fatal("VIN not set after $maxTries tries");
+      if (_vehicle == null) {
+        CustomLogger.fatal("VIN not set after ${maxTries + 1} tries");
         return false;
-      } else {
-        CustomLogger.d("VIN: $_vehicleVin");
       }
     } catch (e) {
       CustomLogger.fatal("Error in requesting VIN: $e");
       return false;
+    } finally {
+      isVoltageCommandOkToSend = true;
     }
     return true;
   }
 
   Future<void> _startRequestingMileage() async {
-    if (_vehicleVin == null) {
+    if (_vehicle == null) {
       CustomLogger.w("VIN is null, can't request mileage");
       return;
     }
     _mileageSendCommandTimer =
-        Timer.periodic(const Duration(seconds: 3), (_) async {
+        Timer.periodic(const Duration(seconds: 2), (_) async {
       CustomLogger.d("Calling _mileageSendCommandTimer");
       try {
         if (_device.isDisconnected) {
@@ -449,7 +351,7 @@ class Elm327Controller {
           _mileageSendCommandTimer = null;
           return;
         }
-        await sendCommand(VehicleUtils.getVehicleMileageCommand(_vehicleVin!));
+        await sendCommand(VehicleUtils.getVehicleMileageCommand(_vehicle!.vin));
       } catch (e) {
         CustomLogger.e("Error in sending mileage command: $e");
       }
@@ -462,18 +364,10 @@ class Elm327Controller {
       CustomLogger.w("Trip already running, skipping telemetry collection");
       return;
     }
+    isTelemetryRunning = true;
     CustomLogger.i("Starting telemetry collection");
-    await _startTrip();
-    CustomLogger.i("Trip start completed");
-    final isVinSet = await _requestVin();
-    if (isVinSet) {
-      // VIN is a required field for requesting mileage (see vehicle_utils.dart)
-      TripController().updateTripVehicle(Vehicle.fromVin(_vehicleVin!));
-      CustomLogger.d("VIN is set, starting mileage request");
-      await _startRequestingMileage();
-    } else {
-      await endTrip();
-    }
+    await _requestVin();
+    await _startRequestingMileage();
   }
 
   // check if VIN is valid

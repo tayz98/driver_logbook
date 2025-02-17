@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:driver_logbook/models/trip_location.dart';
@@ -8,10 +9,15 @@ class GpsService {
   static final GpsService _instance = GpsService._internal();
   factory GpsService() => _instance;
 
-  Future<Position> get currentPosition async =>
-      await Geolocator.getCurrentPosition();
-  Future<Position?> get lastKnownPosition async =>
-      await Geolocator.getLastKnownPosition();
+  Future<Position?> get currentPosition async {
+    try {
+      return await Geolocator.getCurrentPosition();
+    } catch (e) {
+      return await Geolocator.getLastKnownPosition();
+    }
+  }
+  // Future<Position?> get lastKnownPosition async =>
+  //     await Geolocator.getLastKnownPosition();
 
   late LocationSettings _locationSettings;
   LocationSettings get locationSettings => _locationSettings;
@@ -79,10 +85,14 @@ class GpsService {
     }
   }
 
-  Future<TripLocation> getLocationFromPosition(Position position) async {
+  Future<TripLocation>? getLocationFromCurrentPosition() async {
+    final Position? position = await currentPosition;
+    if (position == null) {
+      CustomLogger.e('Position could not be determined');
+    }
     try {
-      final List<Placemark> placemarks =
-          await placemarkFromCoordinates(position.latitude, position.longitude);
+      final List<Placemark> placemarks = await placemarkFromCoordinates(
+          position!.latitude, position.longitude);
       return TripLocation(
         street: placemarks.first.street ?? '',
         city: placemarks.first.locality ?? '',
@@ -95,7 +105,7 @@ class GpsService {
         street: '',
         city: '',
         postalCode: '',
-        latitude: position.latitude,
+        latitude: position!.latitude,
         longitude: position.longitude,
       );
     }

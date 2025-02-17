@@ -1,6 +1,8 @@
 import 'dart:async';
 
-import 'package:driver_logbook/controllers/ios_elm327_controller.dart';
+import 'package:driver_logbook/models/telemetry_bus.dart';
+import 'package:driver_logbook/models/telemetry_event.dart';
+import 'package:driver_logbook/services/elm327_service.dart';
 import 'package:driver_logbook/controllers/trip_controller.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/utils/extra.dart';
@@ -22,8 +24,7 @@ class IosBluetoothService {
   late String targetName; // target name for scanning
   List<String> knownRemoteIds = []; // list of known remote ids to connect to
   late SharedPreferences _prefs; // used for storing persistent data
-  IosElm327Controller?
-      _elm327Controller; // elm327 controller for handling elm327 commands
+  Elm327Service? _elm327Service; // ELM327 controller
 
   IosBluetoothService._internal() {
     _initialize();
@@ -58,7 +59,7 @@ class IosBluetoothService {
       } else if (event.connectionState ==
           BluetoothConnectionState.disconnected) {
         Future.delayed(const Duration(seconds: 5), () async {
-          if (event.device.remoteId == _elm327Controller?.deviceId &&
+          if (event.device.remoteId == _elm327Service?.deviceId &&
               event.device.isDisconnected) {
             await _diposeElmController();
           }
@@ -105,8 +106,12 @@ class IosBluetoothService {
   }
 
   Future<void> _diposeElmController() async {
-    await _elm327Controller?.dispose();
-    _elm327Controller = null;
+    TelemetryEvent event = TelemetryEvent(
+      voltage: 0.0,
+    );
+    TelemetryBus().publish(event);
+    await _elm327Service?.dispose();
+    _elm327Service = null;
   }
 
   // return the device with the best signal strength
@@ -132,11 +137,11 @@ class IosBluetoothService {
   }
 
   Future<void> _setupConnectedDevice(BluetoothDevice device) async {
-    if (_elm327Controller?.isTripInProgress == true) {
+    if (_elm327Service?.isTripInProgress == true) {
       // if a trip is in progress, don't set up a new connected device
       CustomLogger.d("Trip in progress, not setting up new connected device");
       return;
-    } else if (_elm327Controller?.isTripInProgress == false) {
+    } else if (_elm327Service?.isTripInProgress == false) {
       // if no trip is in progress, dispose the controller, to start a new one
       _diposeElmController();
     }
@@ -216,7 +221,7 @@ class IosBluetoothService {
     }
 
     if (writeCharacteristic != null && notifyCharacteristic != null) {
-      _elm327Controller = IosElm327Controller(
+      _elm327Service = Elm327Service(
           writeCharacteristic: writeCharacteristic,
           notifyCharacteristic: notifyCharacteristic,
           device: device);
@@ -224,19 +229,19 @@ class IosBluetoothService {
           "Chraracteristics found, starting ELM327 with device: ${device.remoteId.str}");
       _dataSubscription = notifyCharacteristic.lastValueStream.listen((data) {
         CustomLogger.d("Received data!");
-        _elm327Controller!.handleReceivedData(data);
+        _elm327Service!.handleReceivedData(data);
       });
       if (_dataSubscription != null) {
         device.cancelWhenDisconnected(_dataSubscription!, delayed: true);
       }
-      final initialized = await _elm327Controller?.initialize() ?? false;
+      final initialized = await _elm327Service?.initialize() ?? false;
       if (!initialized) {
         CustomLogger.e("ELM327 initialization failed");
         device.disconnectAndUpdateStream();
       } else {
         CustomLogger.i("ELM327 successfully initialized");
         CustomLogger.d("Starting checking for voltage");
-        await _elm327Controller!.startVoltageTimer();
+        await _elm327Service!.startVoltageTimer();
       }
     } else {
       CustomLogger.e("Characteristics not found, can't start ELM327");

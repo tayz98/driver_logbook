@@ -48,7 +48,7 @@ class Trip {
     return TripLocation.fromJson(jsonDecode(startLocationJson!));
   }
 
-  bool isTripCompleted() {
+  bool isTripCorrect() {
     // if a trip is business, it must have start and end mileage, start and end location and vehicle
     if (tripCategoryEnum == TripCategory.business) {
       return startMileage != null &&
