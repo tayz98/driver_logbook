@@ -38,6 +38,10 @@
 	<string>This app needs access to location when open.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Your location is required for accurate notifaction benefits for you  lso you cane disable it with no problem </string>
+	<key>NSLocationUsageDescription</key>
+	<string>Older devices need location.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Need location when in use</string>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>This app uses notifications to alert you about important updates and events.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
