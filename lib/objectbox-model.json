@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "5:1832358271218994760",
-      "lastPropertyId": "17:54122279934429300",
+      "lastPropertyId": "18:2505408175064725867",
       "name": "Trip",
       "properties": [
         {
@@ -52,6 +52,11 @@
         {
           "id": "17:54122279934429300",
           "name": "vehicleJson",
+          "type": 9
+        },
+        {
+          "id": "18:2505408175064725867",
+          "name": "startTimestamp",
           "type": 9
         }
       ],

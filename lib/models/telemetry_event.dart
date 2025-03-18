@@ -10,4 +10,9 @@ class TelemetryEvent {
     this.vehicle,
     this.mileage,
   });
+
+  @override
+  String toString() {
+    return 'TelemetryEvent(voltage: $voltage, vehicle: ${vehicle?.toString() ?? 'null'}, mileage: $mileage)';
+  }
 }

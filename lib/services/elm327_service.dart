@@ -30,7 +30,8 @@ class Elm327Service {
       _mileageSendCommandTimer; // used for sending mileage requests continuously
   String _responseBuffer = ''; // buffer for incoming data from the elm327
   Vehicle? _vehicle; // used for saving the vehicle
-  bool isVoltageCommandOkToSend = true;
+  int? _mileage;
+  double? voltage;
   bool isTelemetryRunning = false;
 
   Elm327Service({
@@ -99,10 +100,10 @@ class Elm327Service {
     _voltageTimer?.cancel();
     _tripTimeoutTimer?.cancel();
     _tripTimeoutTimer = null;
-    _mileageSendCommandTimer?.cancel();
-    _mileageSendCommandTimer = null;
+    _stopMileageTimer();
     isTelemetryRunning = false;
-    isVoltageCommandOkToSend = true;
+    _mileage = null;
+    voltage = null;
     CustomLogger.i("ELM327 disposed");
   }
 
@@ -129,6 +130,28 @@ class Elm327Service {
       CustomLogger.e("Error in _sendCommand: $e");
       return false;
     }
+  }
+
+  void sendTelemetryEvent() {
+    if (voltage == null && _vehicle == null && _mileage == null) {
+      CustomLogger.w("Cannot send telemetry event: all values are null");
+      return;
+    }
+
+    final TelemetryEvent event = TelemetryEvent(
+      voltage: _voltageVal,
+      vehicle: _vehicle,
+      mileage: _mileage,
+    );
+
+    // filter out null values
+    final Map<String, dynamic> logValues = {};
+    if (event.voltage != null) logValues['voltage'] = event.voltage;
+    if (event.vehicle != null) logValues['vehicle'] = event.vehicle!.vin;
+    if (event.mileage != null) logValues['mileage'] = event.mileage;
+
+    TelemetryBus().publish(event);
+    CustomLogger.i("Telemetry event sent: $logValues");
   }
 
   // manage incoming data from elm327
@@ -214,24 +237,39 @@ class Elm327Service {
       final voltageIntValue = int.tryParse(voltageString);
       if (voltageIntValue != null) {
         _voltageVal = voltageIntValue / 10;
+        voltage = _voltageVal;
+        sendTelemetryEvent();
         CustomLogger.d("Voltage is: $_voltageVal");
         final rssi = await _device.readRssi();
         if (_voltageVal! >= 13.0 && rssi >= -70) {
-          final event = TelemetryEvent(
-            voltage: _voltageVal,
-          );
-          TelemetryBus().publish(event);
-          CustomLogger.i(
-              "Voltage is at or above 13V, engine is running, and signal strength is good");
-          CustomLogger.d("Cancelling voltage timer and starting telemetry");
-          // _voltageTimer?.cancel();
-          // _voltageTimer = null;
           if (!isTelemetryRunning) {
             await _startTelemetryCollection();
           }
+          CustomLogger.i(
+              "Voltage is at or above 13V, engine is running, and signal strength is good");
+          // CustomLogger.d("Cancelling voltage timer and starting telemetry");
+          // _voltageTimer?.cancel();
+          // _voltageTimer = null;
+        } else if (_voltageVal! < 12.8) {
+          isTelemetryRunning = false;
+          _stopMileageTimer();
         }
       } else {
         CustomLogger.w("Voltage int couldn't be parsed, is null");
+      }
+    }
+  }
+
+  void _stopMileageTimer() {
+    if (_mileageSendCommandTimer != null) {
+      try {
+        if (_mileageSendCommandTimer!.isActive) {
+          _mileageSendCommandTimer!.cancel();
+          CustomLogger.d("Mileage timer cancelled");
+        }
+        _mileageSendCommandTimer = null;
+      } catch (e) {
+        CustomLogger.e('Failed to cancel mileage timer: $e');
       }
     }
   }
@@ -247,7 +285,11 @@ class Elm327Service {
     final isVinValid = _checkVin(vin);
     if (isVinValid) {
       _vehicle ??= Vehicle.fromVin(vin);
-      CustomLogger.d("VIN valid and vehicle set");
+      if (_vehicle != null) {
+        CustomLogger.i("Vehicle set: ${_vehicle!.toJson()}");
+      } else {
+        CustomLogger.w("Vehicle is null");
+      }
     } else {
       CustomLogger.w("VIN is invalid");
     }
@@ -259,8 +301,8 @@ class Elm327Service {
     CustomLogger.i("Mileage response: $mileage");
     final isMileageValid = _checkMileage(mileage);
     if (isMileageValid) {
-      TelemetryEvent event = TelemetryEvent(mileage: mileage);
-      TelemetryBus().publish(event);
+      _mileage = mileage;
+      CustomLogger.i("Mileage set: $mileage");
     } else {
       CustomLogger.w("Mileage is invalid");
     }
@@ -277,10 +319,6 @@ class Elm327Service {
           _voltageTimer = null;
           return;
         }
-        if (!isVoltageCommandOkToSend) {
-          CustomLogger.w("Voltage command not ok to send");
-          return;
-        }
         await sendCommand(voltageCommand);
       } catch (e) {
         CustomLogger.e("Error in _voltageTimer: $e");
@@ -290,13 +328,15 @@ class Elm327Service {
 
   // request VIN from the vehicle
   Future<bool> _requestVin() async {
-    isVoltageCommandOkToSend = false;
+    final wasTimerActive = _voltageTimer?.isActive ?? false;
+    _voltageTimer?.cancel();
+
     CustomLogger.d("Requesting VIN");
     if (_voltageVal == null) {
       CustomLogger.fatal("Voltage is null, can't request VIN");
       return false;
     }
-    const int maxTries = 10;
+    const int maxTries = 5;
     try {
       if (_device.isDisconnected) {
         CustomLogger.w("Device is not connected, can't request VIN");
@@ -317,8 +357,6 @@ class Elm327Service {
         if (_vehicle != null) {
           // checking if VIN was set
           CustomLogger.i("VIN set after ${i + 1} tries");
-          TelemetryEvent event = TelemetryEvent(vehicle: _vehicle);
-          TelemetryBus().publish(event);
           return true;
         }
       }
@@ -331,7 +369,9 @@ class Elm327Service {
       CustomLogger.fatal("Error in requesting VIN: $e");
       return false;
     } finally {
-      isVoltageCommandOkToSend = true;
+      if (wasTimerActive) {
+        startVoltageTimer();
+      }
     }
     return true;
   }
@@ -342,7 +382,7 @@ class Elm327Service {
       return;
     }
     _mileageSendCommandTimer =
-        Timer.periodic(const Duration(seconds: 2), (_) async {
+        Timer.periodic(const Duration(seconds: 5), (_) async {
       CustomLogger.d("Calling _mileageSendCommandTimer");
       try {
         if (_device.isDisconnected) {
@@ -367,7 +407,9 @@ class Elm327Service {
     isTelemetryRunning = true;
     CustomLogger.i("Starting telemetry collection");
     await _requestVin();
-    await _startRequestingMileage();
+    if (_vehicle != null) {
+      await _startRequestingMileage();
+    }
   }
 
   // check if VIN is valid

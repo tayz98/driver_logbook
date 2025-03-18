@@ -1,18 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:driver_logbook/controllers/trip_controller.dart';
+import 'package:driver_logbook/models/globals.dart';
 import 'package:driver_logbook/models/telemetry_bus.dart';
 import 'package:driver_logbook/models/telemetry_event.dart';
 import 'package:driver_logbook/objectbox.dart';
-import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:driver_logbook/utils/extra.dart';
 import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:driver_logbook/services/http_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/services/elm327_service.dart';
@@ -57,7 +54,7 @@ class BluetoothTaskHandler extends TaskHandler {
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await _initializeData(); // e.g. shared preferences, objectbox, etc.
-    _initializeTime(); // initialize time for date formatting
+    // _initializeTime(); // initialize time for date formatting
     await _initializeBluetooth(); // complete bluetooth initialization
     CustomLogger.i('Service successfully started');
   }
@@ -65,21 +62,11 @@ class BluetoothTaskHandler extends TaskHandler {
   /// only used for trasmitting trips to the remote server
   @override
   void onRepeatEvent(DateTime timestamp) async {
-    final tripsToTransmit = TripRepository.fetchCompletedAndCancelledTrips();
-    if (tripsToTransmit.isEmpty) {
-      CustomLogger.d("No trips to transmit");
+    if (TripController().isTripInProgress) {
+      CustomLogger.d("Trip in progress, not transmitting");
       return;
     }
-    for (final trip in tripsToTransmit) {
-      final response =
-          await HttpService().post(type: ServiceType.trip, body: trip.toJson());
-      if (response.statusCode == 201) {
-        CustomLogger.i("Trip transmitted successfully");
-        TripRepository.deleteTrip(trip.id);
-      } else {
-        CustomLogger.w("Error in transmitting trip: ${response.body}");
-      }
-    }
+    syncTrips();
   }
 
   /// only used for receiving data from the main app (trip category and scanned remote ids)
@@ -144,7 +131,7 @@ class BluetoothTaskHandler extends TaskHandler {
     CustomLogger.d("Cleaning up data on destroy");
     _cancelAllStreams();
     _cancelAllTimer();
-    _diposeElmController();
+    _disposeElmService();
   }
 
   // --------------------------------------------------------------------------
@@ -177,63 +164,83 @@ class BluetoothTaskHandler extends TaskHandler {
   // PRIVATE METHODS: Bluetooth
   // --------------------------------------------------------------------------
 
+  /// Initializes the Bluetooth functionality, sets up event listeners, and manages connections.
+  ///
+  /// This function performs the following tasks:
+  /// - Configures `FlutterBluePlus` options for restoring state on iOS.
+  /// - Ensures Bluetooth is enabled on Android devices.
+  /// - Starts a periodic scan timer to discover nearby Bluetooth devices.
+  /// - Listens for Bluetooth connection state changes and manages reconnections.
+  /// - Updates and saves scan results to avoid redundant device scanning.
+  /// - Fetches and connects to available Bluetooth devices.
   Future<void> _initializeBluetooth() async {
-    FlutterBluePlus.setOptions(restoreState: true);
+    FlutterBluePlus.setOptions(
+        restoreState: true); // restoreState needed for iOS
     CustomLogger.d('[BluetoothTaskHandler] Initializing Bluetooth...');
+    // Ensure Bluetooth is turned on for Android devices (not working on iOS)
     if (Platform.isAndroid) {
       await FlutterBluePlus.turnOn();
     }
 
-    // start scanning for devices continuously when no device is connected
+    /// Periodically scans for Bluetooth devices every 50 seconds.
+    ///
+    /// - In production, this should be increased to **100 seconds or more** to optimize battery usage.
     _scanTimer = Timer.periodic(const Duration(seconds: 50), (_) async {
-      // in production set to to 100 seconds
       CustomLogger.d("scan timer started");
       await _scanDevices();
     });
 
-    /// listen  for connection state changes and manage the connection
+    /// Listens for Bluetooth connection state changes and manages device connections accordingly.
     _connectionStateSubscription ??=
         FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {
       CustomLogger.i(
           "Event Device: ${event.device}, New Connection state: $event.connectionState");
-      // on every connection state change, check for the nearest device
+      // On every connection state change, find the nearest device
       final tempDevice = await _findNearestDevice();
       if (event.connectionState == BluetoothConnectionState.connected) {
+        // immediately setup the nearest connected device on connected state change
         if (tempDevice != null) {
           _setupConnectedDevice(tempDevice);
         }
-        // if connected, cancel scans
-        CustomLogger.d("BLE disconnect timer cancelled on connection");
-        // TODO: check if this works
       } else if (event.connectionState ==
           BluetoothConnectionState.disconnected) {
-        Future.delayed(const Duration(seconds: 5), () async {
-          if (event.device.remoteId == _elm327Service?.deviceId &&
-              event.device.isDisconnected) {
-            await _diposeElmController();
-          }
-        });
+        // if the disconnected device was used for the elm327 service,
+        // dispose wait for 5 seconds and check if the device is still disconnected
+        if (event.device.remoteId == _elm327Service?.deviceId) {
+          await Future.delayed(const Duration(seconds: 5), () async {
+            if (event.device.isDisconnected) {
+              // dispose service after 5 seconds
+              await _disposeElmService();
+            }
+          });
+        }
 
+        /// If auto-connect is disabled (unexpected behavior), enable it again.
+        ///
+        /// - This is a **safety measure** to ensure devices can reconnect automatically after disconnection.
         if (!event.device.isAutoConnectEnabled) {
-          // if auto connect is disabled by disconnecting, enable it again
-          // this usually shouldn't happen, but for safety reasons we check it
           event.device.connectAndUpdateStream();
           CustomLogger.d("Auto connect enabled again");
         }
+        // if the disconnected device was not used for the elm327 service,
+        // try to setup the nearest connected device
         if (tempDevice != null) {
           _setupConnectedDevice(tempDevice);
         }
       }
     });
 
-    // use a subscription to update the scan results and save them
+    /// Listens for Bluetooth scan results and processes them.
+    ///
+    /// - Avoids adding duplicate devices by checking against `knownRemoteIds`.
+    /// - Stores newly discovered device IDs in shared preferences.
+    /// - Initiates connections to available devices.
     _scanResultsSubscription ??=
         FlutterBluePlus.onScanResults.listen((results) async {
       CustomLogger.i("Scan results: $results");
       if (results.isNotEmpty) {
         for (var result in results) {
           if (knownRemoteIds.contains(result.device.remoteId.str)) {
-            // skip device that were already scanned
             CustomLogger.d(
                 "Remote id already known: ${result.device.remoteId.str}");
             continue;
@@ -241,7 +248,6 @@ class BluetoothTaskHandler extends TaskHandler {
             CustomLogger.d(
                 "New remote id scanned and added: ${result.device.remoteId.str}");
             knownRemoteIds.add(result.device.remoteId.str);
-            // overwrite shared preference with the new list
             _prefs.setStringList("knownRemoteIds", knownRemoteIds);
           }
         }
@@ -251,20 +257,18 @@ class BluetoothTaskHandler extends TaskHandler {
     });
     CustomLogger.d(
         "Fetching and connecting to devices in _initializeBluetooth");
+    // fetch for the first time in the initialization
     await _fetchAndConnectToDevices();
     CustomLogger.d("_initializeBluetooth completed");
   }
 
-  void _initializeTime() async {
-    await initializeDateFormatting('de_DE');
-    Intl.defaultLocale = 'de_DE';
-  }
+  Future<void> _disposeElmService() async {
+    if (TripController().isTripInProgress) {
+      CustomLogger.d("Trip in progress, not disposing controller");
+      TelemetryEvent event = TelemetryEvent(voltage: 0.0);
+      TelemetryBus().publish(event);
+    }
 
-  Future<void> _diposeElmController() async {
-    TelemetryEvent event = TelemetryEvent(
-      voltage: 0.0,
-    );
-    TelemetryBus().publish(event);
     await _elm327Service?.dispose();
     _elm327Service = null;
   }
@@ -355,7 +359,7 @@ class BluetoothTaskHandler extends TaskHandler {
       return;
     } else if (_elm327Service?.isTripInProgress == false) {
       // if no trip is in progress, dispose the controller, to start a new one
-      _diposeElmController();
+      _disposeElmService();
     }
 
     CustomLogger.d("Setting up connected device: ${device.remoteId.str}");
@@ -393,7 +397,6 @@ class BluetoothTaskHandler extends TaskHandler {
     CustomLogger.d('Initialized knownRemoteIds');
     await TripController.initialize();
     CustomLogger.d('Initialized TripController');
-    // CustomLogger.d('Initialized GpsService');
     await VehicleUtils.initializeVehicleModels();
     CustomLogger.d('Initialized VehicleModels');
   }

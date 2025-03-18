@@ -8,19 +8,20 @@ import './vehicle.dart';
 @Entity()
 class Trip {
   @Id()
-  int id = 0;
+  int id;
 
-  String? startLocationJson;
-  String? endLocationJson;
-  String? vehicleJson;
-  int? startMileage;
-  String? endTimestamp;
-  int? endMileage;
-  String tripCategory;
-  String tripStatus;
+  final String? startLocationJson;
+  final String? endLocationJson;
+  final String? vehicleJson;
+  final int? startMileage;
+  final String? endTimestamp;
+  final int? endMileage;
+  final String tripCategory;
+  final String tripStatus;
   final String startTimestamp;
 
   Trip({
+    this.id = 0,
     this.startMileage,
     this.vehicleJson,
     this.startLocationJson,
@@ -29,7 +30,36 @@ class Trip {
     this.endTimestamp,
     required this.tripStatus,
     required this.tripCategory,
-  }) : startTimestamp = DateTime.now().toIso8601String();
+    String? startTimestamp,
+  }) : startTimestamp =
+            startTimestamp ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+  // Create a copy of this Trip with optional new values
+  Trip copyWith({
+    int? id,
+    String? startLocationJson,
+    String? endLocationJson,
+    String? vehicleJson,
+    int? startMileage,
+    String? endTimestamp,
+    int? endMileage,
+    String? tripCategory,
+    String? tripStatus,
+    String? startTimestamp,
+  }) {
+    return Trip(
+      id: id ?? this.id,
+      startLocationJson: startLocationJson ?? this.startLocationJson,
+      endLocationJson: endLocationJson ?? this.endLocationJson,
+      vehicleJson: vehicleJson ?? this.vehicleJson,
+      startMileage: startMileage ?? this.startMileage,
+      endTimestamp: endTimestamp ?? this.endTimestamp,
+      endMileage: endMileage ?? this.endMileage,
+      tripCategory: tripCategory ?? this.tripCategory,
+      tripStatus: tripStatus ?? this.tripStatus,
+      startTimestamp: startTimestamp ?? this.startTimestamp,
+    );
+  }
 
   TripCategory get tripCategoryEnum {
     return TripCategory.values.firstWhere((e) => e.toString() == tripCategory);
@@ -59,18 +89,25 @@ class Trip {
     }
     // if a trip is private, it must have start and end mileage and vehicle
     if (tripCategoryEnum == TripCategory.private ||
-        tripCategoryEnum == TripCategory.private) {
+        tripCategoryEnum == TripCategory.commute) {
       return startMileage != null && endMileage != null && vehicleJson != null;
     }
     return false;
   }
 
-  set startLocation(TripLocation? location) {
-    startLocationJson = location != null ? jsonEncode(location.toJson()) : null;
+  // Create a new Trip with updated startLocation
+  Trip withStartLocation(TripLocation? location) {
+    return copyWith(
+      startLocationJson:
+          location != null ? jsonEncode(location.toJson()) : null,
+    );
   }
 
-  set vehicle(Vehicle? vehicle) {
-    vehicleJson = vehicle != null ? jsonEncode(vehicle.toJson()) : null;
+  // Create a new Trip with updated vehicle
+  Trip withVehicle(Vehicle? vehicle) {
+    return copyWith(
+      vehicleJson: vehicle != null ? jsonEncode(vehicle.toJson()) : null,
+    );
   }
 
   Vehicle? get vehicle {
@@ -80,12 +117,17 @@ class Trip {
     return Vehicle.fromJson(jsonDecode(vehicleJson!));
   }
 
-  // Getter/Setter for endLocation
+  // Getter for endLocation
   TripLocation? get endLocation => endLocationJson != null
       ? TripLocation.fromJson(jsonDecode(endLocationJson!))
       : null;
-  set endLocation(TripLocation? location) =>
-      endLocationJson = location != null ? jsonEncode(location.toJson()) : null;
+
+  // Create a new Trip with updated endLocation
+  Trip withEndLocation(TripLocation? location) {
+    return copyWith(
+      endLocationJson: location != null ? jsonEncode(location.toJson()) : null,
+    );
+  }
 
   String getCategoryShortForm(String category) {
     return category.split('.').last;
@@ -103,7 +145,6 @@ class Trip {
       'vehicle': vehicle?.toJson(),
       'startTimestamp': startTimestamp,
       'endTimestamp': endTimestamp,
-      'endDate': endTimestamp,
       'tripCategory': getCategoryShortForm(tripCategory),
       'tripStatus': getStatusShortForm(tripStatus),
       'startLocation': startLocation?.toJson(),
@@ -113,6 +154,7 @@ class Trip {
 
   static Trip fromJson(Map<String, dynamic> json) {
     return Trip(
+      id: json['id'] ?? 0,
       startMileage: json['startMileage'],
       endMileage: json['endMileage'],
       vehicleJson: json['vehicle'] != null ? jsonEncode(json['vehicle']) : null,
@@ -124,7 +166,8 @@ class Trip {
       endTimestamp: json['endTimestamp'],
       tripStatus: json['tripStatus'],
       tripCategory: json['tripCategory'],
-    )..id = json['id'] ?? 0;
+      startTimestamp: json['startTimestamp'],
+    );
   }
 
   @override

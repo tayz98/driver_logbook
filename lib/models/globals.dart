@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:driver_logbook/bluetooth_task_handler.dart';
 import 'package:driver_logbook/notification_configuration.dart';
+import 'package:driver_logbook/repositories/trip_repository.dart';
+import 'package:driver_logbook/services/http_service.dart';
+import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
 
 // services
 // init the foreground service
@@ -92,7 +95,7 @@ final List<Permission> permissions = [
 ];
 
 // request all permissions needed for the foreground service to work
-Future<void> requestAllPermissions(BuildContext context) async {
+Future<bool> requestAllPermissions(BuildContext context) async {
   bool allGranted = true;
 
   try {
@@ -108,11 +111,9 @@ Future<void> requestAllPermissions(BuildContext context) async {
     // additional notification permission
     await requestNotificationPermission();
 
-    if (Platform.isAndroid || Platform.isIOS) {
-      final bool notificationGranted = await checkNotificationPermission();
-      if (!notificationGranted) {
-        allGranted = false;
-      }
+    final bool notificationGranted = await checkNotificationPermission();
+    if (!notificationGranted) {
+      allGranted = false;
     }
 
     LocationPermission locationPermission = await Geolocator.checkPermission();
@@ -123,27 +124,30 @@ Future<void> requestAllPermissions(BuildContext context) async {
       }
     }
 
-    if (allGranted) {
-      if (context.mounted) _showPermissionsGrantedDialog(context);
-    } else {
-      if (context.mounted) _showPermissionsDeniedDialog(context);
-    }
+    // if (allGranted) {
+    //   if (context.mounted) _showPermissionsGrantedDialog(context);
+    // } else {
+    //   if (context.mounted) _showPermissionsDeniedDialog(context);
+    // }
+    return allGranted;
   } catch (e) {
     debugPrint('Error while requesting permissions: $e');
-    allGranted = false;
-    if (context.mounted) _showPermissionsDeniedDialog(context);
+    return false;
+    // allGranted = false;
+    // if (context.mounted) _showPermissionsDeniedDialog(context);
   } finally {
-    if (allGranted) {
-      permissionGrantedForThisSession = true;
-      SharedPreferences.getInstance().then((prefs) {
-        // remember permission state
-        prefs.setBool('arePermissionsGranted', allGranted);
-      });
-    }
+    // return allGranted;
+    // if (allGranted) {
+    // permissionGrantedForThisSession = true;
+    // SharedPreferences.getInstance().then((prefs) {
+    //   // remember permission state
+    //   prefs.setBool('arePermissionsGranted', allGranted);
+    // });
+    // }
   }
 }
 
-void _showPermissionsDeniedDialog(BuildContext context) {
+void showPermissionsDeniedDialog(BuildContext context) {
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -166,7 +170,24 @@ void _showPermissionsDeniedDialog(BuildContext context) {
   );
 }
 
-void _showPermissionsGrantedDialog(BuildContext context) {
+Future<void> syncTrips() async {
+  final tripsToTransmit = TripRepository.fetchCompletedAndCancelledTrips();
+  for (final trip in tripsToTransmit) {
+    final requestBody = trip.toJson();
+    CustomLogger.i("Sending trip request: $requestBody");
+
+    final response =
+        await HttpService().post(type: ServiceType.trip, body: requestBody);
+    if (response.statusCode == 201) {
+      CustomLogger.i("Trip transmitted successfully");
+      TripRepository.deleteTrip(trip.id);
+    } else {
+      CustomLogger.w("Error in transmitting trip: ${response.body}");
+    }
+  }
+}
+
+void showPermissionsGrantedDialog(BuildContext context) {
   showDialog(
     context: context,
     barrierDismissible: false,
