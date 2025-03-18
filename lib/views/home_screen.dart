@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:driver_logbook/models/globals.dart';
 import 'package:driver_logbook/models/trip_category.dart';
 import 'package:driver_logbook/objectbox.dart';
-import 'package:driver_logbook/repositories/trip_repository.dart';
 import 'package:driver_logbook/utils/custom_log.dart';
 import 'package:driver_logbook/views/settings_screen.dart';
 import 'package:driver_logbook/widgets/choose_trip_mode_buttons.dart';
@@ -59,6 +58,7 @@ class HomeState extends State<Home> {
           showPermissionsDeniedDialog(context);
         }
       }
+      await syncTrips();
       // Check if service is running and set the state accordingly
       // if (await FlutterForegroundTask.isRunningService && permissionsGranted) {}
     });

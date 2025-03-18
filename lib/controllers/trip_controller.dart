@@ -42,7 +42,6 @@ class TripController {
     return _instance;
   }
 
-  // Add method to check trip activity
   void _checkTripActivity() {
     if (_currentTrip == null || _lastTelemetryEventTime == null) {
       _tripActivityTimer?.cancel();
@@ -64,7 +63,6 @@ class TripController {
     }
   }
 
-  // Add method to start or reset the inactivity timer
   void _startOrResetInactivityTimer() {
     // Cancel existing timer if it exists
     _tripActivityTimer?.cancel();
@@ -99,11 +97,11 @@ class TripController {
   }
 
   Future<void> _startTrip() async {
-    showBasicNotification(title: "Fahrt gestartet", body: "Fahrt gestartet");
     if (_currentTrip != null || _tripState != TripState.idle) {
       CustomLogger.e("Trip already started");
       return;
     }
+        showBasicNotification(title: "Fahrt gestartet", body: "Fahrt gestartet");
     _tripState = TripState.starting;
     _instance._prefs.reload();
 

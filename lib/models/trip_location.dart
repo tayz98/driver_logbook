@@ -33,8 +33,9 @@ class TripLocation {
       street: json['street'],
       city: json['city'],
       postalCode: json['postalCode'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
+          latitude: (json['latitude'] ?? 0.0).toDouble(),
+    longitude: (json['longitude'] ?? 0.0).toDouble(),
+
     );
   }
 }

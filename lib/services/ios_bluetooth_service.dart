@@ -9,7 +9,6 @@ import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:driver_logbook/objectbox.dart';
 
 class IosBluetoothService {
   static final IosBluetoothService _instance = IosBluetoothService._internal();
@@ -34,7 +33,6 @@ class IosBluetoothService {
 
   // create all necessary data
   Future<void> _initializeData() async {
-    await dotenv.load(fileName: ".env");
     targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
     targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
     CustomLogger.d('Initialized dotenv');
@@ -42,12 +40,6 @@ class IosBluetoothService {
     CustomLogger.d('Initializing data...');
     _prefs = await SharedPreferences.getInstance();
     CustomLogger.d('Initialized SharedPreferences');
-    try {
-      await ObjectBox.create();
-      CustomLogger.d('Initialized ObjectBox');
-    } catch (e) {
-      CustomLogger.e('ObjectBox error: $e');
-    }
     knownRemoteIds = _prefs.getStringList("knownRemoteIds") ?? [];
     CustomLogger.d('Initialized knownRemoteIds');
     await TripController.initialize();
@@ -55,6 +47,7 @@ class IosBluetoothService {
     await VehicleUtils.initializeVehicleModels();
     CustomLogger.d('Initialized VehicleModels');
   }
+
 
   // find new devices
   Future<void> _scanDevices() async {
@@ -74,9 +67,8 @@ class IosBluetoothService {
     await FlutterBluePlus.adapterState
         .where((val) => val == BluetoothAdapterState.on)
         .first;
-    _initializeData();
+    await _initializeData();
     FlutterBluePlus.setOptions(restoreState: true);
-    TripController.initialize();
     _scanTimer = Timer.periodic(const Duration(seconds: 50), (_) async {
       CustomLogger.d("scan timer started");
       await _scanDevices();
