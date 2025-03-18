@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:driver_logbook/models/telemetry_bus.dart';
 import 'package:driver_logbook/models/telemetry_event.dart';
 import 'package:driver_logbook/services/elm327_service.dart';
@@ -10,6 +9,7 @@ import 'package:driver_logbook/utils/vehicle_utils.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:driver_logbook/objectbox.dart';
 
 class IosBluetoothService {
   static final IosBluetoothService _instance = IosBluetoothService._internal();
@@ -24,26 +24,57 @@ class IosBluetoothService {
   late String targetName; // target name for scanning
   List<String> knownRemoteIds = []; // list of known remote ids to connect to
   late SharedPreferences _prefs; // used for storing persistent data
-  Elm327Service? _elm327Service; // ELM327 controller
+  Elm327Service? _elm327Service; // ELM327 service
+  // Timer:
+  Timer? _scanTimer; // timer to scan for devices if disconnected
 
   IosBluetoothService._internal() {
     _initialize();
   }
+
+  // create all necessary data
+  Future<void> _initializeData() async {
+    await dotenv.load(fileName: ".env");
+    targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
+    targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
+    CustomLogger.d('Initialized dotenv');
+
+    CustomLogger.d('Initializing data...');
+    _prefs = await SharedPreferences.getInstance();
+    CustomLogger.d('Initialized SharedPreferences');
+    knownRemoteIds = _prefs.getStringList("knownRemoteIds") ?? [];
+    CustomLogger.d('Initialized knownRemoteIds');
+    await TripController.initialize();
+    CustomLogger.d('Initialized TripController');
+    await VehicleUtils.initializeVehicleModels();
+    CustomLogger.d('Initialized VehicleModels');
+  }
+
+  // find new devices
+  Future<void> _scanDevices() async {
+    try {
+      CustomLogger.d("Scanning for devices...");
+      await FlutterBluePlus.startScan(
+          withServices: [targetService],
+          withNames: [targetName],
+          timeout: const Duration(seconds: 2));
+    } catch (e) {
+      CustomLogger.e("Error in _scanDevices: $e");
+      return;
+    }
+  }
+
   void _initialize() async {
     await FlutterBluePlus.adapterState
         .where((val) => val == BluetoothAdapterState.on)
         .first;
-
-    targetName = dotenv.get("TARGET_ADV_NAME", fallback: "");
-    targetService = Guid(dotenv.get('TARGET_SERVICE', fallback: ''));
-    CustomLogger.d('IOS: Initialized dotenv');
-    _prefs = await SharedPreferences.getInstance();
-    knownRemoteIds = _prefs.getStringList('knownRemoteIds') ?? [];
-    CustomLogger.d('IOS: Initialized knownRemoteIds');
-    await VehicleUtils.initializeVehicleModels();
+    _initializeData();
     FlutterBluePlus.setOptions(restoreState: true);
     TripController.initialize();
-
+    _scanTimer = Timer.periodic(const Duration(seconds: 50), (_) async {
+      CustomLogger.d("scan timer started");
+      await _scanDevices();
+    });
     _connectionStateSubscription ??=
         FlutterBluePlus.events.onConnectionStateChanged.listen((event) async {
       CustomLogger.i(
@@ -58,12 +89,14 @@ class IosBluetoothService {
         CustomLogger.d("BLE disconnect timer cancelled on connection");
       } else if (event.connectionState ==
           BluetoothConnectionState.disconnected) {
-        Future.delayed(const Duration(seconds: 5), () async {
-          if (event.device.remoteId == _elm327Service?.deviceId &&
-              event.device.isDisconnected) {
-            await _diposeElmController();
-          }
-        });
+        if (event.device.remoteId == _elm327Service?.deviceId) {
+          await Future.delayed(const Duration(seconds: 5), () async {
+            if (event.device.isDisconnected) {
+              // dispose service after 5 seconds
+              await _disposeElmService();
+            }
+          });
+        }
 
         if (!event.device.isAutoConnectEnabled) {
           // if auto connect is disabled by disconnecting, enable it again
@@ -102,14 +135,15 @@ class IosBluetoothService {
         "Fetching and connecting to devices in _initializeBluetooth");
     await _fetchAndConnectToDevices();
     CustomLogger.d("_initializeBluetooth completed");
-    _startPeriodicScans();
   }
 
-  Future<void> _diposeElmController() async {
-    TelemetryEvent event = TelemetryEvent(
-      voltage: 0.0,
-    );
-    TelemetryBus().publish(event);
+  Future<void> _disposeElmService() async {
+    if (TripController().isTripInProgress) {
+      CustomLogger.d("Trip in progress, not disposing controller");
+      TelemetryEvent event = TelemetryEvent(voltage: 0.0);
+      TelemetryBus().publish(event);
+    }
+
     await _elm327Service?.dispose();
     _elm327Service = null;
   }
@@ -143,30 +177,20 @@ class IosBluetoothService {
       return;
     } else if (_elm327Service?.isTripInProgress == false) {
       // if no trip is in progress, dispose the controller, to start a new one
-      _diposeElmController();
+      _disposeElmService();
     }
 
     CustomLogger.d("Setting up connected device: ${device.remoteId.str}");
+    await _requestMtu(device);
     await _discoverCharacteristicsAndStartElm327(device);
   }
 
-  void _startPeriodicScans() async {
-    await _startScan();
-    Timer.periodic(const Duration(seconds: 25), (_) async {
-      await _startScan();
-    });
-  }
-
-  // find new devices
-  Future<void> _startScan() async {
+  Future<void> _requestMtu(BluetoothDevice device) async {
     try {
-      CustomLogger.d("Scanning for devices...");
-      await FlutterBluePlus.startScan(
-          withServices: [targetService],
-          withNames: [targetName],
-          timeout: const Duration(seconds: 2));
+      CustomLogger.d("Requesting MTU...");
+      await device.requestMtu(128, predelay: 0);
+      CustomLogger.d("MTU after request: ${device.mtu}");
     } catch (e) {
-      CustomLogger.e("Error in _scanDevices: $e");
       return;
     }
   }
@@ -248,11 +272,3 @@ class IosBluetoothService {
     }
   }
 }
-
-//   void _cancelAllStreams() {
-//     _connectionStateSubscription?.cancel();
-//     _scanResultsSubscription?.cancel();
-//     _connectionStateSubscription = null;
-//     _scanResultsSubscription = null;
-//   }
-// }
