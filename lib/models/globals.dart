@@ -11,7 +11,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 
-// services
+// services and permissions
 // init the foreground service
 
 void initForegroundService() {

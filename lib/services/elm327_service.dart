@@ -9,14 +9,15 @@ import 'package:driver_logbook/models/telemetry_event.dart';
 import 'package:driver_logbook/models/telemetry_bus.dart';
 
 class Elm327Service {
+  // bluetooth related
   final BluetoothDevice _device;
   get deviceId => _device.remoteId;
   final BluetoothCharacteristic _writeCharacteristic;
   // ignore: unused_field
   final BluetoothCharacteristic _notifyCharacteristic;
   bool _isInitialized = false;
-  // just a getter for task handler and to simplify the code
   bool get isTripInProgress => TripController().currentTrip != null;
+
   // telemetry-related:
   double?
       _voltageVal; // used for checking voltage of the vehicle (engine runnning)

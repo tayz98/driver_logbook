@@ -64,7 +64,6 @@ class TripController {
   }
 
   void _startOrResetInactivityTimer() {
-    // Cancel existing timer if it exists
     _tripActivityTimer?.cancel();
 
     // Only start the timer if a trip is in progress
