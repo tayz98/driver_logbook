@@ -6,7 +6,7 @@ Diese App ist ein elektronisches Fahrtenbuch für Android und iOS. Sie verbindet
 
 - Automatische Fahrtenerkennung über Bordspannung (ATRV ≥ 13,0 V = Motor an; < 12,8 V = Motor aus)
 - BLE‑Kommunikation mit ELM327: VIN auslesen (0902), fahrzeugspezifische Kilometer‑Abfrage
-- Hintergrunddienst auf Android mit persistenter Benachrichtigung
+- Hintergrunddienst auf Android und iOS
 - GPS‑Positionsbestimmung und Reverse‑Geocoding für Start/Ende
 - Lokale Persistenz mit ObjectBox, spätere Übertragung per REST (x-api-key)
 - Auswahl der Fahrtkategorie (z. B. dienstlich/privat) in der App
